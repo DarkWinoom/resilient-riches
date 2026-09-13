@@ -16,6 +16,32 @@ afterEach(() => {
 });
 const props = { anchor: '2026-09-09', today: '2026-09-09' };
 describe('period calendar and disabled explanations', () => {
+  it('pages the year grid in groups of twelve without a long year list', async () => {
+    wrapper = mount(PeriodCalendar, { props: { ...props, period: 'year' } });
+    await flushPromises();
+    expect(wrapper.findAll('[role="option"]')).toHaveLength(12);
+    expect(wrapper.get('[aria-label="后12年"]').attributes('disabled')).toBeDefined();
+    await wrapper.get('[aria-label="前12年"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.get('.year-page-controls').text()).toContain('2005 — 2016');
+    const year = wrapper.findAll('[role="option"]').find((item) => item.text() === '2015')!;
+    await year.find('.dp--overlay-cell').trigger('click');
+    expect(wrapper.emitted('select')?.[0]).toEqual(['2015-01-01']);
+  });
+  it('uses the paged year overlay when selecting a month in an older year', async () => {
+    wrapper = mount(PeriodCalendar, { props: { ...props, period: 'month' } });
+    await flushPromises();
+    await wrapper.get('[aria-label="2026-选择年份"]').trigger('click');
+    await flushPromises();
+    await wrapper.get('[aria-label="前12年"]').trigger('click');
+    await flushPromises();
+    const year = wrapper.findAll('[role="option"]').find((item) => item.text() === '2015')!;
+    await year.find('.dp--overlay-cell').trigger('click');
+    await flushPromises();
+    const month = wrapper.findAll('[role="option"]').find((item) => item.text() === '8月')!;
+    await month.find('.dp--overlay-cell').trigger('click');
+    expect(wrapper.emitted('select')?.[0]).toEqual(['2015-08-01']);
+  });
   it('selects a calendar day without text input and prevents future dates', async () => {
     wrapper = mount(PeriodCalendar, { props: { ...props, period: 'day' } });
     await flushPromises();

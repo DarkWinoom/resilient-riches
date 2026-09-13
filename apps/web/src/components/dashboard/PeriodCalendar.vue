@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { VueDatePicker } from '@vuepic/vue-datepicker';
 import type { ModelValue, AriaLabelsConfig } from '@vuepic/vue-datepicker';
 import { zhCN } from 'date-fns/locale';
@@ -9,6 +9,32 @@ import AppIcon from '../ui/AppIcon.vue';
 
 const props = defineProps<{ period: Period; anchor: string; today: string }>();
 const emit = defineEmits<{ select: [date: string] }>();
+const pageFor = (year: number) => Math.floor((year - 1) / 12) * 12 + 1;
+const visibleYear = ref(Number(props.anchor.slice(0, 4)));
+const yearPage = ref(pageFor(visibleYear.value));
+const yearOverlay = ref(false);
+const choosingYear = computed(() => props.period === 'year' || yearOverlay.value);
+watch(
+  () => [props.anchor, props.period],
+  () => {
+    visibleYear.value = Number(props.anchor.slice(0, 4));
+    yearPage.value = pageFor(visibleYear.value);
+    yearOverlay.value = false;
+  },
+);
+function navigateYear(direction: number) {
+  const next = yearPage.value + direction * 12;
+  if (next >= 1 && next <= Number(props.today.slice(0, 4))) yearPage.value = next;
+}
+function overlayChanged(value: { open: boolean; overlay: string }) {
+  if (value.overlay !== 'year') return;
+  yearOverlay.value = value.open;
+  if (value.open) yearPage.value = pageFor(visibleYear.value);
+}
+function calendarChanged(value: { year: number }) {
+  visibleYear.value = value.year;
+  if (!choosingYear.value) yearPage.value = pageFor(value.year);
+}
 function localDate(value: string) {
   const [year = 1, month = 1, day = 1] = value.split('-').map(Number);
   const date = new Date(0);
@@ -75,6 +101,29 @@ function select(value: ModelValue) {
 </script>
 <template>
   <div class="period-calendar" data-disabled-default="超出可选日期范围，不能选择未来期间">
+    <div v-if="choosingYear" class="year-page-controls">
+      <button
+        type="button"
+        class="icon-button"
+        aria-label="前12年"
+        :disabled="yearPage === 1"
+        data-disabled-reason="已到支持的最早年份"
+        @click="navigateYear(-1)"
+      >
+        <AppIcon name="caret-left" />
+      </button>
+      <span aria-live="polite">{{ yearPage }} — {{ yearPage + 11 }}</span>
+      <button
+        type="button"
+        class="icon-button"
+        aria-label="后12年"
+        :disabled="yearPage + 12 > Number(today.slice(0, 4))"
+        data-disabled-reason="不能选择未来年份"
+        @click="navigateYear(1)"
+      >
+        <AppIcon name="caret-right" />
+      </button>
+    </div>
     <VueDatePicker
       :key="period"
       :model-value="model"
@@ -90,11 +139,13 @@ function select(value: ModelValue) {
       :aria-labels="aria"
       :min-date="localDate('0001-01-01')"
       :max-date="maximum"
-      :year-range="[1, Number(today.slice(0, 4))]"
+      :year-range="[yearPage, yearPage + 11]"
       prevent-min-max-navigation
       :transitions="false"
       :action-row="{ showSelect: false, showCancel: false, showPreview: false }"
       @update:model-value="select"
+      @overlay-toggle="overlayChanged"
+      @update-month-year="calendarChanged"
       ><template #arrow-left><AppIcon name="caret-left" /></template
       ><template #arrow-right><AppIcon name="caret-right" /></template
     ></VueDatePicker>
