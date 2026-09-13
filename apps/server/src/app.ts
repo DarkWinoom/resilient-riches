@@ -12,6 +12,7 @@ export async function createApp(options: {
   webRoot?: string;
   logger?: boolean;
   clock?: () => string;
+  publicOrigin?: string | undefined;
 }) {
   const app = Fastify({
     logger: options.logger ?? false,
@@ -20,7 +21,7 @@ export async function createApp(options: {
   app.addHook('onClose', async () => {
     options.database.close();
   });
-  registerLedgerRoutes(app, options.database, options.clock);
+  registerLedgerRoutes(app, options.database, options.clock, options.publicOrigin);
   app.get<{ Reply: HealthResponse }>('/api/v1/health', (_request, reply) => {
     try {
       const settings = options.database

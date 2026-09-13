@@ -15,6 +15,8 @@
     "build": "pnpm -r build",
     "start": "node apps/server/dist/start.js",
     "db:migrate": "node apps/server/dist/migrate.js",
+    "db:backup": "node apps/server/dist/backup.js",
+    "db:restore": "node apps/server/dist/restore.js",
     "typecheck": "pnpm build:core && pnpm -r typecheck && tsc -p tsconfig.tests.json",
     "lint": "eslint . --max-warnings=0",
     "format": "prettier --write .",

@@ -68,5 +68,57 @@ describe('server foundation', () => {
     expect(() => readConfig({ RR_PORT: '65536' })).toThrow();
     expect(() => readConfig({ RR_DATABASE_PATH: '' })).toThrow();
     expect(() => readConfig({ RR_HOST: ' ' })).toThrow();
+    expect(readConfig({ RR_PUBLIC_ORIGIN: 'https://ledger.example.com/' }).publicOrigin).toBe(
+      'https://ledger.example.com',
+    );
+    for (const origin of [
+      'file:///etc',
+      'https://user:pass@example.com',
+      'https://example.com/path',
+      'https://example.com?key=value',
+    ])
+      expect(() => readConfig({ RR_PUBLIC_ORIGIN: origin })).toThrow();
+  });
+  it('accepts only the configured browser origin behind an HTTPS proxy', async () => {
+    const app = await createApp({
+      database: fixture.open(),
+      publicOrigin: 'https://ledger.example.com',
+    });
+    const payload = {
+      name: '代理验收',
+      color: '#b69a60',
+      openingDate: '2026-01-01',
+      openingBalance: '100',
+      historicalPnl: '0',
+      note: '',
+    };
+    try {
+      expect(
+        (
+          await app.inject({
+            method: 'POST',
+            url: '/api/v1/categories',
+            headers: { host: 'app:8080', origin: 'https://ledger.example.com' },
+            payload,
+          })
+        ).statusCode,
+      ).toBe(201);
+      expect(
+        (
+          await app.inject({
+            method: 'POST',
+            url: '/api/v1/categories',
+            headers: {
+              host: 'app:8080',
+              origin: 'https://other.example.com',
+              'x-forwarded-proto': 'https',
+            },
+            payload,
+          })
+        ).statusCode,
+      ).toBe(403);
+    } finally {
+      await app.close();
+    }
   });
 });

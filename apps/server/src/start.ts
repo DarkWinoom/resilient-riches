@@ -6,7 +6,12 @@ loadEnvironment();
 const config = readConfig();
 const database = openDatabase(config.databasePath);
 try {
-  const app = await createApp({ database, webRoot: config.webRoot, logger: true });
+  const app = await createApp({
+    database,
+    webRoot: config.webRoot,
+    publicOrigin: config.publicOrigin,
+    logger: true,
+  });
   for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     process.once(signal, () => {
       void app.close().catch((error: unknown) => {

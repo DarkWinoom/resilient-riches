@@ -28,7 +28,12 @@ const object = (properties: Record<string, unknown>, required = Object.keys(prop
 });
 const idParams = object({ id });
 
-export function registerLedgerRoutes(app: FastifyInstance, database: AppDatabase, clock = today) {
+export function registerLedgerRoutes(
+  app: FastifyInstance,
+  database: AppDatabase,
+  clock = today,
+  publicOrigin?: string,
+) {
   const service = createLedgerService(database, clock);
   const dashboardService = createDashboardService(database, clock);
   const reportService = createReportService(database, clock);
@@ -59,7 +64,7 @@ export function registerLedgerRoutes(app: FastifyInstance, database: AppDatabase
     try {
       allowed =
         new URL(request.headers.origin).origin ===
-        new URL(`${request.protocol}://${request.headers.host}`).origin;
+        (publicOrigin ?? new URL(`${request.protocol}://${request.headers.host}`).origin);
     } catch {
       allowed = false;
     }
