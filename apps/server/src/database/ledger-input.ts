@@ -1,55 +1,61 @@
 import { formatMoney } from '@resilient-riches/core';
-import type { Category, DailyEntry } from '@resilient-riches/core';
+import type { CategoryRecord, EntryRecord } from '@resilient-riches/core';
 import type { SQLOutputValue } from 'node:sqlite';
 import type { AppDatabase } from './database.ts';
 
 type Row = Record<string, SQLOutputValue>;
-
 function text(row: Row, key: string): string {
   const value = row[key];
-  if (typeof value !== 'string') throw new Error(`Invalid database text: ${key}`);
+  if (typeof value !== 'string') throw new Error('Invalid database text: ' + key);
   return value;
 }
-
-function money(row: Row, key: string): string {
+function integer(row: Row, key: string): bigint {
   const value = row[key];
-  if (typeof value !== 'bigint') throw new Error(`Invalid database money: ${key}`);
-  return formatMoney(value);
+  if (typeof value !== 'bigint') throw new Error('Invalid database integer: ' + key);
+  return value;
 }
-
+export function categoryFromRow(row: Row): CategoryRecord {
+  return {
+    id: text(row, 'id'),
+    name: text(row, 'name'),
+    color: text(row, 'color'),
+    openingDate: text(row, 'opening_date'),
+    openingBalance: formatMoney(integer(row, 'opening_balance_minor')),
+    historicalPnl: formatMoney(integer(row, 'historical_pnl_minor')),
+    note: text(row, 'note'),
+    archivedOn: row.archived_on === null ? null : text(row, 'archived_on'),
+    sortOrder: Number(integer(row, 'sort_order')),
+    revision: Number(integer(row, 'revision')),
+    createdAt: text(row, 'created_at'),
+    updatedAt: text(row, 'updated_at'),
+  };
+}
+export function entryFromRow(row: Row): EntryRecord {
+  return {
+    id: text(row, 'id'),
+    categoryId: text(row, 'category_id'),
+    date: text(row, 'date'),
+    closingBalance: formatMoney(integer(row, 'closing_balance_minor')),
+    buy: formatMoney(integer(row, 'buy_minor')),
+    sell: formatMoney(integer(row, 'sell_minor')),
+    note: text(row, 'note'),
+    revision: Number(integer(row, 'revision')),
+    createdAt: text(row, 'created_at'),
+    updatedAt: text(row, 'updated_at'),
+  };
+}
 export function loadLedgerInput(database: AppDatabase): {
-  categories: Category[];
-  entries: DailyEntry[];
+  categories: CategoryRecord[];
+  entries: EntryRecord[];
 } {
-  const categories = database
-    .prepare(
-      `SELECT id, name, color, opening_date, opening_balance_minor,
-    historical_pnl_minor, note, archived_on FROM categories ORDER BY sort_order, name`,
-    )
-    .all()
-    .map((row): Category => ({
-      id: text(row, 'id'),
-      name: text(row, 'name'),
-      color: text(row, 'color'),
-      openingDate: text(row, 'opening_date'),
-      openingBalance: money(row, 'opening_balance_minor'),
-      historicalPnl: money(row, 'historical_pnl_minor'),
-      note: text(row, 'note'),
-      archivedOn: row.archived_on === null ? null : text(row, 'archived_on'),
-    }));
-  const entries = database
-    .prepare(
-      `SELECT category_id, date, closing_balance_minor, buy_minor,
-    sell_minor, note FROM daily_entries ORDER BY date, category_id`,
-    )
-    .all()
-    .map((row): DailyEntry => ({
-      categoryId: text(row, 'category_id'),
-      date: text(row, 'date'),
-      closingBalance: money(row, 'closing_balance_minor'),
-      buy: money(row, 'buy_minor'),
-      sell: money(row, 'sell_minor'),
-      note: text(row, 'note'),
-    }));
-  return { categories, entries };
+  return {
+    categories: database
+      .prepare('SELECT * FROM categories ORDER BY sort_order, name')
+      .all()
+      .map(categoryFromRow),
+    entries: database
+      .prepare('SELECT * FROM daily_entries ORDER BY date, category_id')
+      .all()
+      .map(entryFromRow),
+  };
 }

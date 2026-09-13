@@ -168,6 +168,7 @@ export function calculateLedger(input: {
   entries: readonly DailyEntry[];
   through: string;
   from?: string;
+  timeline?: 'daily' | 'events';
 }): LedgerResult {
   parseDate(input.through, 'through');
   if (input.from !== undefined) parseDate(input.from, 'from');
@@ -215,7 +216,21 @@ export function calculateLedger(input: {
     input.from ?? (earliest !== undefined && earliest <= input.through ? earliest : input.through);
   const portfolio: InternalDay[] = [];
   let lastRecordedDate: string | null = null;
-  for (const date of datesBetween(start, input.through)) {
+  const events = [
+    ...new Set([
+      start,
+      from,
+      input.through,
+      ...states.flatMap((state) => [
+        state.category.openingDate,
+        ...(state.category.archivedOn ? [state.category.archivedOn] : []),
+      ]),
+      ...input.entries.map((entry) => entry.date),
+    ]),
+  ]
+    .filter((date) => date >= start && date <= input.through)
+    .sort();
+  for (const date of input.timeline === 'events' ? events : datesBetween(start, input.through)) {
     const opening = sumMoney(states.map((state) => state.previous));
     const buys: bigint[] = [];
     const sells: bigint[] = [];
@@ -235,7 +250,18 @@ export function calculateLedger(input: {
       if (category.archivedOn != null && date >= category.archivedOn && closing !== 0n) {
         throw new LedgerError('NONZERO_ARCHIVE', '归档分类必须已经清空余额', 'archivedOn');
       }
-      const values = computeDay(previous, buy, sell, closing);
+      let values: ReturnType<typeof computeDay>;
+      try {
+        values = computeDay(previous, buy, sell, closing);
+      } catch (error) {
+        if (error instanceof LedgerError)
+          throw new LedgerError(
+            error.code,
+            `${category.name}（${date}）：${error.message}`,
+            error.field,
+          );
+        throw error;
+      }
       if (record) {
         state.lastRecordedDate = date;
         hasRecord = true;

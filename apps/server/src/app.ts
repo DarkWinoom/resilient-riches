@@ -5,16 +5,22 @@ import staticFiles from '@fastify/static';
 import type { HealthResponse } from '@resilient-riches/core';
 import { schemaVersion } from './database/database.ts';
 import type { AppDatabase } from './database/database.ts';
+import { registerLedgerRoutes } from './routes/ledger.ts';
 
 export async function createApp(options: {
   database: AppDatabase;
   webRoot?: string;
   logger?: boolean;
+  clock?: () => string;
 }) {
-  const app = Fastify({ logger: options.logger ?? false });
+  const app = Fastify({
+    logger: options.logger ?? false,
+    ajv: { customOptions: { removeAdditional: false, coerceTypes: false, useDefaults: false } },
+  });
   app.addHook('onClose', async () => {
     options.database.close();
   });
+  registerLedgerRoutes(app, options.database, options.clock);
   app.get<{ Reply: HealthResponse }>('/api/v1/health', (_request, reply) => {
     try {
       const settings = options.database

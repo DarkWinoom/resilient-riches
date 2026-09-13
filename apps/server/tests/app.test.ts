@@ -40,7 +40,7 @@ describe('server foundation', () => {
       const index = await app.inject({ method: 'GET', url: '/' });
       expect(index.statusCode).toBe(200);
       expect(index.body).toContain('Resilient Riches');
-      const missing = await app.inject({ method: 'GET', url: '/api/v1/categories' });
+      const missing = await app.inject({ method: 'GET', url: '/api/v1/unknown' });
       expect(missing.statusCode).toBe(404);
       expect(missing.json().code).toBe('NOT_FOUND');
       expect((await app.inject({ method: 'GET', url: '/.env' })).statusCode).toBe(404);
