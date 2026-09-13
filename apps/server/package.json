@@ -4,6 +4,9 @@
   "private": true,
   "type": "module",
   "license": "MIT",
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "dev": "node --watch src/start.ts",
     "build": "tsc -p tsconfig.json",

@@ -4,6 +4,9 @@
   "private": true,
   "type": "module",
   "license": "MIT",
+  "files": [
+    "dist"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

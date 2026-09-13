@@ -1,0 +1,19 @@
+services:
+  app:
+    build: .
+    image: resilient-riches:local
+    init: true
+    restart: unless-stopped
+    ports:
+      - '${RR_BIND_ADDRESS:-127.0.0.1}:${RR_PORT:-8080}:8080'
+    environment:
+      RR_HOST: 0.0.0.0
+      RR_PORT: 8080
+      RR_DATABASE_PATH: /app/data/resilient-riches.sqlite
+      RR_PUBLIC_ORIGIN: ${RR_PUBLIC_ORIGIN:-}
+    volumes:
+      - ledger-data:/app/data
+    stop_grace_period: 20s
+
+volumes:
+  ledger-data:

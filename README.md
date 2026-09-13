@@ -2,9 +2,32 @@
 
 以自定义分类记录资金与收益的个人理财小应用。按自己的节奏更新各分类的余额与资金进出，直观看到持仓和收益变化。
 
-**当前已完成 P4 报表与隐私分享。** 可以管理分类、录入和修改历史余额，查看资产摘要、复利曲线、资金分布与日周月年报表，并保存分享图片。Docker 部署配置与备份恢复将在 P5 提供。
+支持分类管理、历史补录、资产摘要、复利曲线、资金分布、日周月年报表和隐私分享图片。数据保存在自己的 SQLite 账本中，没有登录和多用户功能。
 
-## 本地启动
+## Docker 部署（推荐）
+
+安装 Docker Desktop 或 Docker Engine + Compose 后，在终端运行：
+
+```sh
+git clone https://github.com/DarkWinoom/resilient-riches.git
+cd resilient-riches
+docker compose up -d --build
+```
+
+打开 [本地应用](http://127.0.0.1:8080)。首次启动自动初始化空账本；镜像使用 Node 22，容器以非 root 用户运行。Docker 启动后应用自动重启，手动停止后保持停止状态。
+
+```sh
+docker compose ps          # 查看运行及健康状态
+docker compose logs -f app # 查看日志，Ctrl+C只退出日志查看
+docker compose stop       # 停止应用
+docker compose up -d       # 再次启动
+```
+
+数据库位于命名卷 `ledger-data` 中，容器重建或执行 `docker compose down` 后仍保留。**不要使用 `docker compose down -v`，它会删除数据卷。** 默认卷名带有项目目录前缀，迁移目录时保持同一个 Compose 项目名，或先备份再恢复。
+
+如端口 8080 已占用，将 `.env.example` 复制为 `.env`，把 `RR_PORT` 改为其他端口后重新启动即可。
+
+## Node.js 直接部署
 
 需要 **Node.js 22.22.2 或更新的 Node 22 版本**、**pnpm 11.19.0**。项目统一使用 Node 22。
 
@@ -22,19 +45,89 @@ pnpm start
 
 ## 数据与配置
 
-数据库默认保存为项目目录下的 `data/resilient-riches.sqlite`，不会提交到 Git。SQLite 的关联文件也由该目录保存，不要在服务运行时单独移动或复制主数据库文件。
+Node.js 直接部署的数据库默认保存为项目目录下的 `data/resilient-riches.sqlite`；Docker 使用独立的数据卷，两者不会自动共享账本。要迁移已有数据，请使用下方备份和恢复步骤。SQLite 的关联文件也由数据目录保存，不要在服务运行时单独移动或复制主数据库文件。
 
 需要改端口或数据位置时，将 `.env.example` 复制为 `.env` 后修改：
 
-| 变量               | 默认值                           | 用途                                 |
-| ------------------ | -------------------------------- | ------------------------------------ |
-| `RR_HOST`          | `127.0.0.1`                      | 监听地址，默认仅本机可访问           |
-| `RR_PORT`          | `8080`                           | 后端和生产页面端口                   |
-| `RR_DATABASE_PATH` | `./data/resilient-riches.sqlite` | 数据库路径，相对路径以项目根目录为准 |
+| 变量               | 默认值                           | 用途                                                          |
+| ------------------ | -------------------------------- | ------------------------------------------------------------- |
+| `RR_HOST`          | `127.0.0.1`                      | 监听地址，默认仅本机可访问                                    |
+| `RR_PORT`          | `8080`                           | 后端和生产页面端口                                            |
+| `RR_DATABASE_PATH` | `./data/resilient-riches.sqlite` | 数据库路径，相对路径以项目根目录为准                          |
+| `RR_BIND_ADDRESS`  | `127.0.0.1`                      | Docker 映射到主机的监听地址                                   |
+| `RR_PUBLIC_ORIGIN` | 空                               | HTTPS反向代理时填写完整站点源，如`https://ledger.example.com` |
+
+Docker 固定在容器内监听 `0.0.0.0:8080`，数据位置为 `/app/data/resilient-riches.sqlite`；通过 `RR_BIND_ADDRESS` 和 `RR_PORT` 控制主机访问入口。`RR_HOST` 和 `RR_DATABASE_PATH` 用于 Node.js 直接部署。
 
 如需在局域网访问，可自行调整监听地址。应用不提供登录，也不区分多个用户，能够访问服务的人可以读写账本；远程部署的入口访问控制由部署者配置。
 
 当前使用 Node 22 内建 SQLite API，Node 会输出 `ExperimentalWarning`。本阶段已在 Node 22.22.2 上验证迁移、事务回滚、精确金额读写和数据库重开。
+
+HTTPS 反向代理应转发到应用端口并保留原始 Host，同时设置 `RR_PUBLIC_ORIGIN` 为浏览器访问的源地址（协议、域名及可选端口，不带路径）。配置后，浏览器写请求只接受这个源；不配置时按应用自身的协议和 Host 检查。应用不支持挂在站点子路径下。
+
+## 备份账本
+
+备份命令使用 SQLite 在线快照，服务运行时也可执行，包含已提交的 WAL 数据，得到可单独保存的 `.sqlite` 文件。**每次使用不同的文件名**，命令不会覆盖已有备份。
+
+Docker：
+
+```sh
+docker compose exec app node apps/server/dist/backup.js data/backups/manual-1.sqlite
+docker compose cp app:/app/data/backups/manual-1.sqlite ./ledger-backup.sqlite
+```
+
+第二步将备份保存到当前电脑，可另存至其他磁盘。只保存在数据卷中的备份不能防止整个数据卷丢失。
+
+Node.js 直接部署（先完成构建）：
+
+```sh
+pnpm db:backup backups/manual-1.sqlite
+```
+
+## 恢复账本
+
+恢复会覆盖整个账本。命令默认只校验备份并显示来源、目标和记录数量；确认无误后加 `--confirm` 才执行。恢复前必须停止应用，工具会在数据目录的 `backups/` 中保留覆盖前的原文件；损坏的原文件也会被保留。
+
+Docker 恢复保存在数据卷中的备份：
+
+```sh
+docker compose stop app
+docker compose run --rm --no-deps app node apps/server/dist/restore.js data/backups/manual-1.sqlite
+docker compose run --rm --no-deps app node apps/server/dist/restore.js data/backups/manual-1.sqlite --confirm
+docker compose up -d
+```
+
+若备份在当前电脑，先创建过应用容器，再将文件复制到数据卷并赋予应用用户访问权限：
+
+```sh
+docker compose stop app
+docker compose cp ./ledger-backup.sqlite app:/app/data/restore-input.sqlite
+docker compose run --rm --no-deps --user root app chown node:node /app/data/restore-input.sqlite
+docker compose run --rm --no-deps app node apps/server/dist/restore.js data/restore-input.sqlite
+docker compose run --rm --no-deps app node apps/server/dist/restore.js data/restore-input.sqlite --confirm
+docker compose up -d
+```
+
+Node.js 直接部署：先在运行应用的终端按 `Ctrl+C`，或停止对应的进程服务，然后运行：
+
+```sh
+pnpm db:restore backups/manual-1.sqlite
+pnpm db:restore backups/manual-1.sqlite --confirm
+pnpm start
+```
+
+完整性、外键、迁移历史、业务设置或资金记录校验不通过时，恢复会被拒绝，原账本保持不变。恢复其他版本的数据时，先使用与备份兼容或更新的应用版本；不要用旧版本覆盖更新的数据库。
+
+## 升级
+
+先按上文生成并保存备份，再更新代码：
+
+```sh
+git pull --ff-only
+docker compose up -d --build
+```
+
+直接部署则先停止服务，运行 `git pull --ff-only`、`pnpm install --frozen-lockfile`、`pnpm build`，再 `pnpm start`。启动会自动应用数据库迁移。回退代码前应确认数据库兼容；需要回退数据时恢复升级前备份，而不是直接运行旧版本。
 
 ## 开发与检查
 
@@ -48,6 +141,8 @@ pnpm dev
 pnpm check       # lint、格式、类型、测试和构建
 pnpm test        # 财务计算、数据库、API 和界面联动测试
 pnpm db:migrate  # 单独执行数据库迁移，需先完成构建
+pnpm db:backup backups/example.sqlite  # 在线快照，文件名不能已存在
+pnpm db:restore backups/example.sqlite # 仅校验和预览，停机确认后加--confirm
 ```
 
 | 目录            | 内容                           |
@@ -103,9 +198,16 @@ pnpm db:migrate  # 单独执行数据库迁移，需先完成构建
 
 分类较多时会生成包含全部分类的长图；如果浏览器无法生成过大的图片，可以选择隐藏分类后重试。报表与分享窗口可直接关闭，切换筛选和隐私选项不会触发放弃保存确认。
 
-## 部署计划
+## 常见问题
 
-推荐部署在自己的电脑、NAS 或家庭服务器。当前可按上文通过 Node.js 启动；Docker Compose、生产备份恢复和完整升级说明计划在 P5 提供。项目不限制部署位置。
+- **页面打不开或容器不健康**：先看 `docker compose ps` 和 `docker compose logs app`，确认端口未占用、数据卷可写。直接部署用 `pnpm start` 查看错误输出。
+- **新建或修改被拒绝，提示来源不正确**：HTTPS 代理检查 `RR_PUBLIC_ORIGIN`，不要填写路径；修改配置后重新启动容器或 Node 进程。
+- **换目录后变成空账本**：Docker 默认项目名随目录名变化。回到原目录／原项目名启动，或将原卷账本备份后恢复到新项目；不要删除原卷。
+- **恢复提示存在运行关联文件**：停止所有使用同一账本的进程。异常退出后可先正常启动并关闭一次；如果仍无法启动，先完整保留原数据目录，再将备份恢复到新的空数据库路径，不要直接删除 WAL 文件。
+- **备份提示文件已存在**：换一个文件名，旧备份会被保留。
+- **没有登录页面**：这是单人私有部署工具，能够访问应用的人可以读写账本。推荐本机、NAS 或家庭服务器部署，远程访问由部署者管理入口权限。
+
+项目不限制部署方式。GitHub CI 会在 Node 22 下运行检查和 Docker 构建，不自动上传账本、发布镜像或创建 Release。
 
 ## 收益如何记录
 
