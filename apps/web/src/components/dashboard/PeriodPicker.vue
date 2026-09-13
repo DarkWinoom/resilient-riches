@@ -4,8 +4,8 @@ import { addDays, parseDate, periodRange } from '@resilient-riches/core';
 import type { Period, DateRange } from '@resilient-riches/core';
 import AppButton from '../ui/AppButton.vue';
 import AppIcon from '../ui/AppIcon.vue';
-import AppField from '../ui/AppField.vue';
 import BaseOverlay from '../ui/BaseOverlay.vue';
+import PeriodCalendar from './PeriodCalendar.vue';
 const props = defineProps<{
   period: Period;
   anchor: string;
@@ -14,9 +14,7 @@ const props = defineProps<{
   disabled: boolean;
 }>();
 const emit = defineEmits<{ change: [period: Period, anchor: string] }>();
-const choosing = ref(false),
-  draft = ref(''),
-  error = ref('');
+const choosing = ref(false);
 const labels: { id: Period; label: string }[] = [
   { id: 'day', label: '日' },
   { id: 'week', label: '周' },
@@ -45,14 +43,9 @@ function move(delta: number) {
   const value = adjacent(delta);
   if (value) emit('change', props.period, value);
 }
-function submit() {
-  try {
-    periodRange(props.period, draft.value, props.today);
-    emit('change', props.period, draft.value);
-    choosing.value = false;
-  } catch {
-    error.value = '请输入有效日期，且不能晚于今天';
-  }
+function select(date: string) {
+  emit('change', props.period, date);
+  choosing.value = false;
 }
 </script>
 <template>
@@ -62,17 +55,15 @@ function submit() {
         class="icon-button"
         aria-label="上一期间"
         :disabled="disabled || !adjacent(-1)"
+        :data-disabled-reason="disabled ? '正在读取收益数据，请稍候' : '已到支持的最早期间'"
         @click="move(-1)"
       >
         <AppIcon name="caret-left" /></button
       ><button
         class="range-label"
         :disabled="disabled"
-        @click="
-          draft = anchor;
-          error = '';
-          choosing = true;
-        "
+        :data-disabled-reason="disabled ? '正在读取收益数据，请稍候' : undefined"
+        @click="choosing = true"
       >
         {{ range.from }}<span v-if="range.to !== range.from"> — {{ range.to }}</span
         ><AppIcon name="calendar-blank" /></button
@@ -80,6 +71,7 @@ function submit() {
         class="icon-button"
         aria-label="下一期间"
         :disabled="disabled || !adjacent(1)"
+        :data-disabled-reason="disabled ? '正在读取收益数据，请稍候' : '不能查看未来期间'"
         @click="move(1)"
       >
         <AppIcon name="caret-right" />
@@ -92,6 +84,7 @@ function submit() {
         :key="item.id"
         :aria-pressed="period === item.id"
         :disabled="disabled"
+        :data-disabled-reason="disabled ? '正在读取收益数据，请稍候' : undefined"
         @click="emit('change', item.id, anchor)"
       >
         {{ item.label }}
@@ -100,21 +93,17 @@ function submit() {
   </div>
   <BaseOverlay
     v-if="choosing"
-    title="选择日期"
+    :title="{ day: '选择日期', week: '选择周', month: '选择月份', year: '选择年份' }[period]"
     class="date-overlay"
     @request-close="choosing = false"
-    ><form class="date-form" @submit.prevent="submit">
-      <AppField
-        id="period-date"
-        v-model="draft"
-        label="查看日期所在期间"
-        placeholder="YYYY-MM-DD"
-        :error="error"
-      />
+    ><div class="date-form">
+      <PeriodCalendar :period="period" :anchor="anchor" :today="today" @select="select" />
       <div class="confirmation-actions">
-        <AppButton @click="draft = today">今天</AppButton
-        ><AppButton type="submit" variant="primary">查看</AppButton>
+        <AppButton @click="select(today)">{{
+          { day: '今天', week: '本周', month: '本月', year: '本年' }[period]
+        }}</AppButton
+        ><AppButton @click="choosing = false">关闭</AppButton>
       </div>
-    </form></BaseOverlay
+    </div></BaseOverlay
   >
 </template>

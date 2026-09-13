@@ -75,6 +75,7 @@ onUnmounted(() => observer?.disconnect());
       :aria-controls="panelId"
       :tabindex="modelValue === item.id ? 0 : -1"
       :disabled="disabled"
+      :data-disabled-reason="disabled ? '正在读取或保存记录，请稍候再切换分类' : undefined"
       @click="emit('update:modelValue', item.id)"
     >
       {{ item.label }}<span v-if="item.badge" class="tab-badge">{{ item.badge }}</span>

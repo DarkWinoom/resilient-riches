@@ -70,6 +70,18 @@ function button(text: string) {
 }
 
 describe('bookkeeping UI with real ledger API', () => {
+  it('shows the new-category shortcut only while editing a saved category', async () => {
+    const category = await create();
+    wrapper = mount(CategoryDrawer, {
+      props: { items: [category], today, initialId: null },
+      global,
+    });
+    expect(wrapper.findAll('button').some((item) => item.text() === '新增分类')).toBe(false);
+    await button('稳健理财').trigger('click');
+    await button('新增分类').trigger('click');
+    expect((wrapper.get('#category-name').element as HTMLInputElement).value).toBe('');
+    expect(wrapper.findAll('button').some((item) => item.text() === '新增分类')).toBe(false);
+  });
   it('opens the matching daily report and closes changed report filters without confirmation', async () => {
     await create();
     wrapper = mount(BookkeepingPage, { global });

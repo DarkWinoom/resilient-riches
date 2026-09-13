@@ -57,6 +57,7 @@ onUnmounted(() => {
           class="icon-button"
           :aria-label="`关闭${title}`"
           :disabled="busy"
+          :data-disabled-reason="busy ? '正在保存，请稍候再关闭' : undefined"
           @click="emit('request-close')"
         >
           <AppIcon name="x" />

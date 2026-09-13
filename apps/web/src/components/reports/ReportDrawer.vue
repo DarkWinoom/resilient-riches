@@ -119,7 +119,15 @@ const sharing = ref(false);
       ><AppButton
         variant="primary"
         :disabled="!data || !data.recordCount || loading || !!error"
-        :title="data && !data.recordCount ? '本期没有录入记录，暂不能分享' : ''"
+        :disabled-reason="
+          loading
+            ? '正在读取报表，请稍候'
+            : error
+              ? '报表加载失败，请重试后分享'
+              : !data
+                ? '报表尚未加载'
+                : '本期没有录入记录，暂不能分享'
+        "
         @click="sharing = true"
         ><AppIcon name="export" />分享收益</AppButton
       >

@@ -135,8 +135,13 @@ function order(key: SortKey) {
             <button
               class="icon-button record-button"
               :aria-label="`为${item.name}记录今天`"
-              :title="item.archivedOn ? '归档分类请在记录窗口中选择历史日期' : '记录今天'"
+              :title="item.archivedOn ? undefined : '记录今天'"
               :disabled="!!item.archivedOn"
+              :data-disabled-reason="
+                item.archivedOn
+                  ? '分类已归档，请恢复后记录今天；历史记录可在分类详情中修改'
+                  : undefined
+              "
               @click="$emit('record', item.id)"
             >
               <AppIcon name="plus" />

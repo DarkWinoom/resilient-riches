@@ -53,12 +53,14 @@ function pickMonth(value: number) {
         class="icon-button"
         aria-label="上个月"
         :disabled="disabled || month === '0001-01'"
+        :data-disabled-reason="disabled ? '正在保存，请稍候再切换日期' : '已到支持的最早月份'"
         @click="emit('month', adjacent(-1))"
       >
         <AppIcon name="caret-left" /></button
       ><button
         class="calendar-title"
         :disabled="disabled"
+        :data-disabled-reason="disabled ? '正在保存，请稍候再选择月份' : undefined"
         @click="
           year = month.slice(0, 4);
           choosing = !choosing;
@@ -69,6 +71,7 @@ function pickMonth(value: number) {
         class="icon-button"
         aria-label="下个月"
         :disabled="disabled || month >= today.slice(0, 7)"
+        :data-disabled-reason="disabled ? '正在保存，请稍候再切换日期' : '不能选择未来月份'"
         @click="emit('month', adjacent(1))"
       >
         <AppIcon name="caret-right" />
@@ -86,7 +89,18 @@ function pickMonth(value: number) {
         <button
           v-for="value in 12"
           :key="value"
-          :disabled="!yearValid || `${year}-${String(value).padStart(2, '0')}` > today.slice(0, 7)"
+          :disabled="
+            disabled ||
+            !yearValid ||
+            `${year}-${String(value).padStart(2, '0')}` > today.slice(0, 7)
+          "
+          :data-disabled-reason="
+            disabled
+              ? '正在保存，请稍候再切换日期'
+              : !yearValid
+                ? '请先输入有效年份'
+                : '不能选择未来月份'
+          "
           @click="pickMonth(value)"
         >
           {{ value }} 月
@@ -103,6 +117,7 @@ function pickMonth(value: number) {
             v-if="value"
             :class="['calendar-day', { active: value === date, today: value === today }]"
             :disabled="disabled || value > today"
+            :data-disabled-reason="disabled ? '正在保存，请稍候再切换日期' : '不能录入未来日期'"
             :aria-label="`${value}${loading ? '' : count(value) ? `，${count(value)}个分类有记录` : '，无记录'}`"
             :aria-pressed="value === date"
             @click="emit('date', value)"
@@ -116,6 +131,7 @@ function pickMonth(value: number) {
       <span class="record-dot"></span>有记录<button
         class="text-button"
         :disabled="disabled"
+        :data-disabled-reason="disabled ? '正在保存，请稍候再切换日期' : undefined"
         @click="emit('date', today)"
       >
         回到今天

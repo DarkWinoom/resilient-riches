@@ -6,8 +6,15 @@ withDefaults(
     type?: 'button' | 'submit';
     disabled?: boolean;
     loading?: boolean;
+    disabledReason?: string;
   }>(),
-  { variant: 'secondary', type: 'button', disabled: false, loading: false },
+  {
+    variant: 'secondary',
+    type: 'button',
+    disabled: false,
+    loading: false,
+    disabledReason: '正在处理，请稍候',
+  },
 );
 </script>
 <template>
@@ -16,6 +23,8 @@ withDefaults(
     :class="['button', `button--${variant}`]"
     :disabled="disabled || loading"
     :aria-busy="loading"
+    :data-disabled-reason="disabled || loading ? disabledReason : undefined"
+    :aria-description="disabled || loading ? disabledReason : undefined"
   >
     <AppIcon v-if="loading" name="circle-notch" class="spin" /><slot />
   </button>

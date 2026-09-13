@@ -29,6 +29,7 @@ function update(values: CategoryValues, key: keyof CategoryValues, value: string
         :aria-label="`使用颜色 ${color}`"
         :aria-pressed="modelValue.color === color"
         :disabled="disabled"
+        :data-disabled-reason="disabled ? '正在保存，请稍候再选择颜色' : undefined"
         @click="update(modelValue, 'color', color)"
       ></button>
     </div>

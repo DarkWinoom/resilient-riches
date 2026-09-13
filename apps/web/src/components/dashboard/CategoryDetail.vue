@@ -106,10 +106,15 @@ onUnmounted(() => controller?.abort());
       >
     </div>
     <footer class="overlay-footer">
-      <AppButton :disabled="!data" @click="$emit('edit', id)">编辑分类</AppButton
+      <AppButton
+        :disabled="!data"
+        disabled-reason="分类信息尚未加载，请等待或重试"
+        @click="$emit('edit', id)"
+        >编辑分类</AppButton
       ><AppButton
         variant="primary"
         :disabled="!data || !!data.category.archivedOn"
+        :disabled-reason="!data ? '分类信息尚未加载，请等待或重试' : '分类已归档，请恢复后记录今天'"
         @click="$emit('record', id, today)"
         >记录今日</AppButton
       >

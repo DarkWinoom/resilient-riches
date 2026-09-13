@@ -1,0 +1,117 @@
+.category-count-heading {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  line-height: 24px;
+}
+.category-count-heading .count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  height: 24px;
+  padding: 0 8px;
+  line-height: 24px;
+}
+.disabled-action-hint {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  max-width: min(360px, calc(100vw - 24px));
+  padding: 10px 14px;
+  border: 1px solid #d8c7a5;
+  border-radius: 8px;
+  background: #fffaf0;
+  color: #715a30;
+  box-shadow: 0 6px 24px #302a2520;
+  font-size: 14px;
+  line-height: 1.6;
+  pointer-events: none;
+  overflow-wrap: anywhere;
+}
+.disabled-action-hint::backdrop {
+  background: transparent;
+  pointer-events: none;
+}
+.period-calendar {
+  --dp-font-family: Inter, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  --dp-font-size: 14px;
+  --dp-preview-font-size: 14px;
+  --dp-time-font-size: 14px;
+  --dp-border-radius: 10px;
+  --dp-cell-border-radius: 7px;
+  --dp-cell-size: 38px;
+  --dp-menu-min-width: 300px;
+  --dp-row-margin: 5px 0;
+  --dp-menu-padding: 8px;
+  --dp-overlay-col-padding: 8px;
+}
+.period-calendar .dp--theme-light {
+  --dp-background-color: #fff;
+  --dp-text-color: #302d27;
+  --dp-hover-color: #f3eddf;
+  --dp-hover-text-color: #725323;
+  --dp-primary-color: #9a742e;
+  --dp-primary-disabled-color: #c5b088;
+  --dp-primary-text-color: #fff;
+  --dp-secondary-color: #91897b;
+  --dp-border-color: #e8e2d7;
+  --dp-menu-border-color: transparent;
+  --dp-border-color-hover: #c5af83;
+  --dp-disabled-color: #f5f3ee;
+  --dp-disabled-color-text: #ada69a;
+  --dp-icon-color: #927743;
+  --dp-highlight-color: #ad8e4933;
+  --dp-range-between-dates-background-color: #eee5d2;
+  --dp-range-between-dates-text-color: #725323;
+  --dp-range-between-border-color: #eee5d2;
+}
+.period-calendar .dp--main,
+.period-calendar .dp--menu,
+.period-calendar .dp--calendar,
+.period-calendar .dp--overlay {
+  font-size: 14px;
+  max-width: 100%;
+}
+.period-calendar .dp--flex-display {
+  display: flex;
+  justify-content: center;
+}
+.period-calendar .dp--main {
+  width: 100%;
+}
+.period-calendar .dp--btn,
+.period-calendar .dp--calendar-header-item,
+.period-calendar .dp--cell-inner,
+.period-calendar .dp--overlay-cell,
+.period-calendar .dp--overlay-cell-active {
+  font-size: 14px;
+}
+.period-calendar .dp--cell-disabled {
+  opacity: 0.5;
+}
+.period-calendar .dp--menu {
+  border: 0;
+}
+.calendar-instruction {
+  font-size: 14px;
+  color: var(--muted);
+  margin-top: 14px;
+  line-height: 1.7;
+}
+.date-overlay {
+  width: 390px;
+}
+.date-form {
+  padding: 18px 20px 22px;
+}
+@media (max-width: 420px) {
+  .date-form {
+    padding: 14px 10px 18px;
+  }
+  .period-calendar {
+    --dp-cell-size: 36px;
+    --dp-menu-min-width: 280px;
+    --dp-menu-padding: 4px;
+  }
+}

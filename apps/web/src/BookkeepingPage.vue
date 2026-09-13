@@ -52,7 +52,7 @@ async function record(id: string | null = null, date?: string) {
 </script>
 <template>
   <AppHeader
-    :disabled="!today"
+    :disabled="!today || loading"
     :has-categories="!!items.length"
     @manage="manage()"
     @record="record()"

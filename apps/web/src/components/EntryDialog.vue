@@ -149,7 +149,18 @@ async function deleteRecord() {
         @click="deleteRecord"
         >删除本条记录</AppButton
       ><AppButton :disabled="busy" @click="close">关闭</AppButton
-      ><AppButton variant="primary" :disabled="loading || !active" :loading="busy" @click="save"
+      ><AppButton
+        variant="primary"
+        :disabled="loading || !active"
+        :loading="busy"
+        :disabled-reason="
+          busy
+            ? '正在保存，请稍候'
+            : loading
+              ? '正在读取记录，请稍候'
+              : '该日期暂无可录入分类，请选择其它日期或新增分类'
+        "
+        @click="save"
         >保存当日记录</AppButton
       >
     </footer></BaseOverlay

@@ -232,10 +232,10 @@ async function reload() {
   <BaseOverlay title="分类管理" kind="drawer" :busy="busy" @request-close="close">
     <div class="drawer-body">
       <div class="section-heading">
-        <h3>
+        <h3 class="category-count-heading">
           我的分类 <span class="count">{{ items.length }}</span>
         </h3>
-        <AppButton variant="quiet" :disabled="busy" @click="choose(null)"
+        <AppButton v-if="selected" variant="quiet" :disabled="busy" @click="choose(null)"
           ><AppIcon name="plus" />新增分类</AppButton
         >
       </div>
@@ -245,13 +245,19 @@ async function reload() {
           :key="item.id"
           :class="['category-choice', { selected: selected?.id === item.id }]"
         >
-          <button class="category-choice-label" :disabled="busy" @click="choose(item)">
+          <button
+            class="category-choice-label"
+            :disabled="busy"
+            :data-disabled-reason="busy ? '正在保存，请稍候再切换分类' : undefined"
+            @click="choose(item)"
+          >
             <span class="color-dot" :style="{ background: item.color }"></span>{{ item.name
             }}<span v-if="item.archivedOn" class="muted">已归档</span></button
           ><button
             class="icon-button"
             :aria-label="`上移${item.name}`"
             :disabled="busy || index === 0"
+            :data-disabled-reason="busy ? '正在保存，请稍候' : '已经是第一个分类'"
             @click="move(index, -1)"
           >
             <AppIcon name="arrow-up" /></button
@@ -259,6 +265,7 @@ async function reload() {
             class="icon-button"
             :aria-label="`下移${item.name}`"
             :disabled="busy || index === items.length - 1"
+            :data-disabled-reason="busy ? '正在保存，请稍候' : '已经是最后一个分类'"
             @click="move(index, 1)"
           >
             <AppIcon name="arrow-down" />

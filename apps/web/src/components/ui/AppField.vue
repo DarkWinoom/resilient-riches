@@ -8,6 +8,7 @@ withDefaults(
     multiline?: boolean;
     required?: boolean;
     disabled?: boolean;
+    disabledReason?: string;
     error?: string | undefined;
     hint?: string;
     placeholder?: string;
@@ -19,6 +20,7 @@ withDefaults(
     multiline: false,
     required: false,
     disabled: false,
+    disabledReason: '正在保存，请稍候再修改',
     error: '',
     hint: '',
     placeholder: '',
@@ -41,6 +43,8 @@ function update(event: Event) {
       :id="id"
       :value="modelValue"
       :disabled="disabled"
+      :data-disabled-reason="disabled ? disabledReason : undefined"
+      :aria-description="disabled ? disabledReason : undefined"
       :maxlength="maxlength"
       :placeholder="placeholder"
       :aria-invalid="!!error"
@@ -60,6 +64,8 @@ function update(event: Event) {
         :inputmode="money ? 'decimal' : 'text'"
         :required="required"
         :disabled="disabled"
+        :data-disabled-reason="disabled ? disabledReason : undefined"
+        :aria-description="disabled ? disabledReason : undefined"
         :maxlength="maxlength"
         :placeholder="placeholder"
         :aria-invalid="!!error"
