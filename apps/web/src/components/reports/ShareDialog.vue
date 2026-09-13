@@ -74,7 +74,11 @@ const { exporting, error, success, save } = useReportExport();
     </p>
     <footer class="overlay-footer">
       <AppButton @click="$emit('close')">关闭</AppButton
-      ><AppButton variant="primary" :loading="exporting" @click="save(model)"
+      ><AppButton
+        variant="primary"
+        :disabled="!report.recordCount"
+        :loading="exporting"
+        @click="save(model)"
         ><AppIcon name="download-simple" />保存 PNG</AppButton
       >
     </footer></BaseOverlay

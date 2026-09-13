@@ -116,12 +116,16 @@ const sharing = ref(false);
     </div>
     <footer class="overlay-footer">
       <AppButton @click="$emit('close')">关闭</AppButton
-      ><AppButton variant="primary" :disabled="!data || loading || !!error" @click="sharing = true"
+      ><AppButton
+        variant="primary"
+        :disabled="!data || !data.recordCount || loading || !!error"
+        :title="data && !data.recordCount ? '本期没有录入记录，暂不能分享' : ''"
+        @click="sharing = true"
         ><AppIcon name="export" />分享收益</AppButton
       >
     </footer></BaseOverlay
   ><ShareDialog
-    v-if="sharing && data"
+    v-if="sharing && data && data.recordCount > 0"
     :report="data"
     :initial-private="privateMode"
     @close="sharing = false"

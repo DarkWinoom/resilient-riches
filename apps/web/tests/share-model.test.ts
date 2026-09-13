@@ -55,6 +55,21 @@ function fixture(): ReportResponse {
   };
 }
 describe('private share model and renderer', () => {
+  it('omits the curve from daily shares in every privacy mode', () => {
+    const report = fixture();
+    report.period = 'day';
+    report.range = { from: '2026-09-13', to: '2026-09-13' };
+    for (const hideAmounts of [false, true])
+      for (const hideCategories of [false, true]) {
+        const model = buildShareModel(report, { hideAmounts, hideCategories });
+        const { svg, height } = renderShareSvg(model);
+        expect(model.curve).toEqual([]);
+        expect(svg).toContain('收益日报');
+        expect(svg).not.toMatch(/<path|累计收益率|期初|期末资产/);
+        expect(svg).toContain('当日收益率');
+        expect(height).toBeLessThan(840);
+      }
+  });
   it.each([
     { hideAmounts: false, hideCategories: false },
     { hideAmounts: true, hideCategories: false },
@@ -71,13 +86,20 @@ describe('private share model and renderer', () => {
     expect(json).not.toContain('secret-id');
     expect(json).not.toContain('4321');
     expect(json).not.toContain('最大贡献');
+    expect(json).not.toContain('endingBalance');
+    expect(svg).not.toContain('期末资产');
+    expect(svg).not.toContain('81,234.56');
+    expect(svg).not.toContain('@2026 by DarkWinoom');
+    expect(svg).toContain('x="98" y="109" font-size="32"');
+    expect(svg).toContain('>收益月报</text>');
+    expect(svg).toContain('>稳健生财</text>');
     if (options.hideAmounts) {
       expect(model).not.toHaveProperty('amounts');
       expect(json).not.toMatch(/81234|1234\.56|endingBalance|cumulativePnl/);
       expect(svg).not.toMatch(/81,234|1,234\.56|期末资产|本期收益<|¥/);
     } else {
-      expect(model.amounts?.endingBalance).toBe('81234.56');
-      expect(svg).toContain('81,234.56');
+      expect(model.amounts?.pnl).toBe('1234.56');
+      expect(svg).toContain('1,234.56');
     }
     if (options.hideCategories) {
       expect(model).not.toHaveProperty('categories');

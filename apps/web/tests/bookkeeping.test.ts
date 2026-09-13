@@ -107,7 +107,8 @@ describe('bookkeeping UI with real ledger API', () => {
     await button('分享收益').trigger('click');
     const share = wrapper.getComponent(ShareDialog);
     let svg = decodeURIComponent(share.get('img').attributes('src')!.split(',').slice(1).join(','));
-    expect(svg).toContain('1,100.00');
+    expect(svg).toContain('+100.00');
+    expect(svg).not.toContain('1,100.00');
     expect(svg).not.toContain('不应出现在分享图');
     await share.findAll('[role="switch"]')[0]!.trigger('click');
     await share.findAll('[role="switch"]')[1]!.trigger('click');
@@ -124,7 +125,18 @@ describe('bookkeeping UI with real ledger API', () => {
       configurable: true,
       value: { ready: Promise.resolve() },
     });
-    await create();
+    const category = await create();
+    await api.saveEntries(today, [
+      {
+        categoryId: category.id,
+        categoryRevision: 1,
+        revision: null,
+        closingBalance: '1000',
+        buy: '0',
+        sell: '0',
+        note: '',
+      },
+    ]);
     const report = await api.report('month', today);
     wrapper = mount(ShareDialog, { props: { report, initialPrivate: false }, global });
     await wrapper.findAll('[role="switch"]')[0]!.trigger('click');
@@ -138,6 +150,31 @@ describe('bookkeeping UI with real ledger API', () => {
     await wrapper.get('[aria-label="关闭分享收益"]').trigger('click');
     expect(wrapper.emitted('close')).toHaveLength(1);
     expect(wrapper.find('.confirmation-overlay').exists()).toBe(false);
+  });
+  it('disables sharing for a period without actual records but permits an explicit unchanged record', async () => {
+    const category = await create();
+    wrapper = mount(ReportDrawer, {
+      props: { initialPeriod: 'day', initialAnchor: today, today, privateMode: false },
+      global,
+    });
+    await settle();
+    expect(button('分享收益').attributes('disabled')).toBeDefined();
+    await button('分享收益').trigger('click');
+    expect(wrapper.findComponent(ShareDialog).exists()).toBe(false);
+    await api.saveEntries(today, [
+      {
+        categoryId: category.id,
+        categoryRevision: 1,
+        revision: null,
+        closingBalance: '1000',
+        buy: '0',
+        sell: '0',
+        note: '',
+      },
+    ]);
+    await button('月').trigger('click');
+    await settle();
+    expect(button('分享收益').attributes('disabled')).toBeUndefined();
   });
   it('keeps summary cards fixed across periods and hides monetary details in privacy mode', async () => {
     const category = await create();

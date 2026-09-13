@@ -6,7 +6,6 @@ export interface ShareOptions {
 }
 export interface ShareAmounts {
   pnl: string;
-  endingBalance: string;
 }
 export interface ShareModel {
   period: Period;
@@ -25,23 +24,22 @@ export function buildShareModel(report: ReportResponse, options: ShareOptions): 
     current: report.current,
     returnRate: report.summary.returnRate,
     rateReason: report.summary.rateReason,
-    ...(!options.hideAmounts
-      ? { amounts: { pnl: report.summary.periodPnl, endingBalance: report.summary.closingBalance } }
-      : {}),
-    curve: report.curve.map((point) => ({
-      date: point.date,
-      returnRate: point.returnRate,
-      ...(!options.hideAmounts ? { cumulativePnl: point.cumulativePnl } : {}),
-    })),
+    ...(!options.hideAmounts ? { amounts: { pnl: report.summary.periodPnl } } : {}),
+    curve:
+      report.period === 'day'
+        ? []
+        : report.curve.map((point) => ({
+            date: point.date,
+            returnRate: point.returnRate,
+            ...(!options.hideAmounts ? { cumulativePnl: point.cumulativePnl } : {}),
+          })),
     ...(!options.hideCategories
       ? {
           categories: report.categories.map((category) => ({
             name: category.name,
             color: category.color,
             returnRate: category.returnRate,
-            ...(!options.hideAmounts
-              ? { amounts: { pnl: category.pnl, endingBalance: category.endingBalance } }
-              : {}),
+            ...(!options.hideAmounts ? { amounts: { pnl: category.pnl } } : {}),
           })),
         }
       : {}),

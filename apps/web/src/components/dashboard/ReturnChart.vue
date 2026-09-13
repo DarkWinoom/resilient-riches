@@ -91,8 +91,14 @@ function tick(value: number) {
       ? `${(value / 1e4).toFixed(1)}万`
       : value.toFixed(absolute < 10 ? 1 : 0);
 }
-const tooltip = computed(() => (active.value === null ? null : props.points[active.value]));
+const tooltip = computed(() =>
+  !available.value || active.value === null ? null : props.points[active.value],
+);
 function pointAt(event: PointerEvent) {
+  if (!available.value) {
+    active.value = null;
+    return;
+  }
   const rect = plot.value?.getBoundingClientRect();
   if (!rect) return;
   const index =
@@ -102,6 +108,10 @@ function pointAt(event: PointerEvent) {
   active.value = Math.max(0, Math.min(props.points.length - 1, index));
 }
 function key(event: KeyboardEvent) {
+  if (!available.value) {
+    active.value = null;
+    return;
+  }
   if (!['ArrowLeft', 'ArrowRight', 'Home', 'End', 'Escape'].includes(event.key)) return;
   event.preventDefault();
   if (event.key === 'Escape') {
@@ -146,8 +156,8 @@ const dateLabels = computed(() => {
     <div
       ref="plot"
       class="return-plot"
-      tabindex="0"
-      :aria-label="`累计${shownMode === 'rate' ? '收益率' : '收益金额'}曲线，使用左右方向键查看日期`"
+      :tabindex="available ? 0 : -1"
+      :aria-label="`累计${shownMode === 'rate' ? '收益率' : '收益金额'}曲线，${available ? '使用左右方向键查看日期' : '暂无可展示数据'}`"
       @pointermove="pointAt"
       @pointerleave="active = null"
       @keydown="key"
