@@ -11,6 +11,7 @@ import {
 } from './money.ts';
 import type {
   Category,
+  CurvePoint,
   DailyEntry,
   DayResult,
   LedgerResult,
@@ -69,7 +70,13 @@ export function calculateDay(input: {
   };
 }
 
-function compound(points: readonly InternalDay[]) {
+function compound(
+  points: readonly InternalDay[],
+  onPoint?: (
+    point: InternalDay,
+    rate: { returnRate: string | null; rateReason: RateReason | null },
+  ) => void,
+) {
   const segments: ReturnSegment[] = [];
   let current: { from: string; to: string; factor: Decimal } | undefined;
   let total = new FinancialDecimal(1);
@@ -77,6 +84,19 @@ function compound(points: readonly InternalDay[]) {
   let wiped = false;
   let restarted = false;
   let zeroGain = false;
+  const snapshot = () => {
+    const reason: RateReason | null = zeroGain
+      ? 'zero_capital_gain'
+      : restarted
+        ? 'capital_reset'
+        : valid
+          ? null
+          : 'no_capital';
+    return {
+      returnRate: reason === null ? serializeRate(total.minus(1)) : null,
+      rateReason: reason,
+    };
+  };
   const flush = () => {
     if (!current) return;
     segments.push({
@@ -99,6 +119,7 @@ function compound(points: readonly InternalDay[]) {
           reason: 'zero_capital_gain',
         });
       } else if (current) current.to = point.date;
+      onPoint?.(point, snapshot());
       continue;
     }
     valid = true;
@@ -114,18 +135,11 @@ function compound(points: readonly InternalDay[]) {
       wiped = true;
       flush();
     }
+    onPoint?.(point, snapshot());
   }
   flush();
-  const reason: RateReason | null = zeroGain
-    ? 'zero_capital_gain'
-    : restarted
-      ? 'capital_reset'
-      : valid
-        ? null
-        : 'no_capital';
   return {
-    returnRate: reason === null ? serializeRate(total.minus(1)) : null,
-    rateReason: reason,
+    ...snapshot(),
     segments,
   };
 }
@@ -145,11 +159,34 @@ function serializeDay(point: InternalDay): DayResult {
   };
 }
 
-function series(points: readonly InternalDay[], from: string, historical: bigint): LedgerSeries {
+function series(
+  points: readonly InternalDay[],
+  from: string,
+  historical: bigint,
+  includeCurve = false,
+): LedgerSeries {
   const selected = points.filter((point) => point.date >= from);
   const closing = points.at(-1)?.closing ?? 0n;
   const cumulative = checkTotal(sumMoney(points.map((point) => point.pnl)) + historical);
+  const curve: CurvePoint[] = [];
+  let running = 0n;
+  const performance = compound(
+    selected,
+    includeCurve
+      ? (point, rate) => {
+          running = checkTotal(running + point.pnl);
+          curve.push({
+            date: point.date,
+            pnl: formatMoney(point.pnl),
+            cumulativePnl: formatMoney(running),
+            closingBalance: formatMoney(point.closing),
+            ...rate,
+          });
+        }
+      : undefined,
+  );
   return {
+    ...(includeCurve ? { curve } : {}),
     days: selected.map(serializeDay),
     summary: {
       closingBalance: formatMoney(closing),
@@ -157,7 +194,7 @@ function series(points: readonly InternalDay[], from: string, historical: bigint
       cumulativePnl: formatMoney(cumulative),
       historicalPnl: formatMoney(historical),
       netInvested: formatMoney(checkTotal(closing - cumulative)),
-      ...compound(selected),
+      ...performance,
       lastRecordedDate: points.at(-1)?.lastRecordedDate ?? null,
     },
   };
@@ -168,7 +205,8 @@ export function calculateLedger(input: {
   entries: readonly DailyEntry[];
   through: string;
   from?: string;
-  timeline?: 'daily' | 'events';
+  timeline?: 'daily' | 'events' | 'period';
+  includeCurve?: boolean;
 }): LedgerResult {
   parseDate(input.through, 'through');
   if (input.from !== undefined) parseDate(input.from, 'from');
@@ -226,11 +264,14 @@ export function calculateLedger(input: {
         ...(state.category.archivedOn ? [state.category.archivedOn] : []),
       ]),
       ...input.entries.map((entry) => entry.date),
+      ...(input.timeline === 'period' ? datesBetween(from, input.through) : []),
     ]),
   ]
     .filter((date) => date >= start && date <= input.through)
     .sort();
-  for (const date of input.timeline === 'events' ? events : datesBetween(start, input.through)) {
+  for (const date of input.timeline === 'events' || input.timeline === 'period'
+    ? events
+    : datesBetween(start, input.through)) {
     const opening = sumMoney(states.map((state) => state.previous));
     const buys: bigint[] = [];
     const sells: bigint[] = [];
@@ -303,6 +344,7 @@ export function calculateLedger(input: {
       portfolio,
       from,
       sumMoney(states.filter((state) => state.activated).map((state) => state.historical)),
+      input.includeCurve,
     ),
     categories: states.map((state) => ({
       categoryId: state.category.id,

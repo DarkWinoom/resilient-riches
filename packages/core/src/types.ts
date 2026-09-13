@@ -54,6 +54,16 @@ export interface PerformanceSummary {
 export interface LedgerSeries {
   days: DayResult[];
   summary: PerformanceSummary;
+  curve?: CurvePoint[];
+}
+
+export interface CurvePoint {
+  date: string;
+  pnl: string;
+  cumulativePnl: string;
+  returnRate: string | null;
+  rateReason: RateReason | null;
+  closingBalance: string;
 }
 
 export interface LedgerResult {

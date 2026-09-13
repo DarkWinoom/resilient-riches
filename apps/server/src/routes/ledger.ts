@@ -3,6 +3,8 @@ import { LedgerError, today } from '@resilient-riches/core';
 import type { CategoryPatch, CategoryValues, EntryWrite } from '@resilient-riches/core';
 import type { AppDatabase } from '../database/database.ts';
 import { ApiError, createLedgerService } from '../services/ledger-service.ts';
+import { createDashboardService } from '../services/dashboard-service.ts';
+import type { Period } from '@resilient-riches/core';
 
 const id = { type: 'string', minLength: 1, maxLength: 64 };
 const date = { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' };
@@ -27,6 +29,22 @@ const idParams = object({ id });
 
 export function registerLedgerRoutes(app: FastifyInstance, database: AppDatabase, clock = today) {
   const service = createLedgerService(database, clock);
+  const dashboardService = createDashboardService(database, clock);
+  const periodQuery = object({
+    period: { type: 'string', enum: ['day', 'week', 'month', 'year'] },
+    anchor: date,
+  });
+  app.get<{ Querystring: { period: Period; anchor: string } }>(
+    '/api/v1/dashboard',
+    { schema: { querystring: periodQuery } },
+    (request) => dashboardService.dashboard(request.query.period, request.query.anchor),
+  );
+  app.get<{ Params: { id: string }; Querystring: { period: Period; anchor: string } }>(
+    '/api/v1/categories/:id/detail',
+    { schema: { params: idParams, querystring: periodQuery } },
+    (request) =>
+      dashboardService.detail(request.params.id, request.query.period, request.query.anchor),
+  );
   app.addHook('onRequest', async (request, reply) => {
     if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method) || !request.headers.origin)
       return;
