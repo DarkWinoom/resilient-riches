@@ -1,5 +1,7 @@
 .agents-docs/
 node_modules/
+.pnpm-store/
+*.tsbuildinfo
 dist/
 coverage/
 playwright-report/

@@ -1,0 +1,94 @@
+:root {
+  font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  color: #302d27;
+  background: #f6f5f1;
+  font-size: 16px;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+button {
+  font: inherit;
+}
+.app-shell {
+  max-width: 840px;
+  margin: 0 auto;
+  padding: 64px 24px;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 36px;
+}
+.brand-mark {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: #946e2e;
+  color: #fff;
+  font-size: 25px;
+}
+.brand h1 {
+  margin: 0;
+  font-size: 28px;
+}
+.brand p {
+  margin: 6px 0 0;
+  color: #8a6d36;
+  font-size: 14px;
+  letter-spacing: 1px;
+}
+.status-panel {
+  border: 1px solid #e6dfd0;
+  border-radius: 18px;
+  background: #fff;
+  padding: 32px;
+}
+.status-label {
+  font-size: 14px;
+  color: #82704b;
+}
+.status-panel h2 {
+  font-size: 24px;
+  margin: 14px 0;
+}
+.status-panel p {
+  color: #756f64;
+  line-height: 1.8;
+  margin-bottom: 0;
+}
+.retry-button {
+  border: 0;
+  border-radius: 8px;
+  padding: 12px 20px;
+  margin-top: 20px;
+  background: #946e2e;
+  color: #fff;
+  cursor: pointer;
+}
+.retry-button:hover {
+  background: #805c25;
+}
+.retry-button:focus-visible {
+  outline: 2px solid #946e2e;
+  outline-offset: 4px;
+}
+footer {
+  margin-top: 24px;
+  font-size: 14px;
+  color: #827b6b;
+}
+@media (max-width: 600px) {
+  .app-shell {
+    padding: 36px 20px;
+  }
+  .status-panel {
+    padding: 24px;
+  }
+}
