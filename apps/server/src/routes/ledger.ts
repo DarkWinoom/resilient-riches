@@ -4,6 +4,7 @@ import type { CategoryPatch, CategoryValues, EntryWrite } from '@resilient-riche
 import type { AppDatabase } from '../database/database.ts';
 import { ApiError, createLedgerService } from '../services/ledger-service.ts';
 import { createDashboardService } from '../services/dashboard-service.ts';
+import { createReportService } from '../services/report-service.ts';
 import type { Period } from '@resilient-riches/core';
 
 const id = { type: 'string', minLength: 1, maxLength: 64 };
@@ -30,10 +31,16 @@ const idParams = object({ id });
 export function registerLedgerRoutes(app: FastifyInstance, database: AppDatabase, clock = today) {
   const service = createLedgerService(database, clock);
   const dashboardService = createDashboardService(database, clock);
+  const reportService = createReportService(database, clock);
   const periodQuery = object({
     period: { type: 'string', enum: ['day', 'week', 'month', 'year'] },
     anchor: date,
   });
+  app.get<{ Querystring: { period: Period; anchor: string } }>(
+    '/api/v1/reports',
+    { schema: { querystring: periodQuery } },
+    (request) => reportService(request.query.period, request.query.anchor),
+  );
   app.get<{ Querystring: { period: Period; anchor: string } }>(
     '/api/v1/dashboard',
     { schema: { querystring: periodQuery } },

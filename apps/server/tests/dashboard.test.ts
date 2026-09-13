@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { FinancialDecimal } from '@resilient-riches/core';
-import type { DashboardResponse, CategoryDetailResponse } from '@resilient-riches/core';
+import type {
+  DashboardResponse,
+  CategoryDetailResponse,
+  ReportResponse,
+} from '@resilient-riches/core';
 import { createApp } from '../src/app.ts';
 import { createLedgerService } from '../src/services/ledger-service.ts';
 import { databaseFixture } from './fixtures.ts';
@@ -72,6 +76,68 @@ describe('dashboard aggregation', () => {
       periodClosingBalance: '1100.00',
       periodPnl: '100.00',
     });
+  });
+  it('uses identical report and dashboard results across all four periods', async () => {
+    const { app, category, write, get } = await setup();
+    const a = category('稳健理财', '2026-08-01', '1000', '500');
+    write(a.id, '2026-08-31', '1100');
+    write(a.id, '2026-09-11', '1210');
+    for (const period of ['day', 'week', 'month', 'year']) {
+      const report = (
+        await app.inject({ url: `/api/v1/reports?period=${period}&anchor=2026-09-13` })
+      ).json<ReportResponse>();
+      const dashboard = await get(period);
+      expect(report.summary).toEqual(dashboard.performance);
+      expect(report.curve).toEqual(dashboard.curve);
+      expect(report.current).toBe(true);
+    }
+    const past = (
+      await app.inject({ url: '/api/v1/reports?period=month&anchor=2026-08-01' })
+    ).json<ReportResponse>();
+    expect(past.summary.closingBalance).toBe('1100.00');
+    expect(past.summary.periodPnl).toBe('100.00');
+    expect(past.categories[0]?.endingBalance).toBe('1100.00');
+    expect(past.categories[0]?.lastRecordedDate).toBe('2026-08-31');
+    expect(past.current).toBe(false);
+  });
+  it('describes actual positive contribution without fabricating market or ranking claims', async () => {
+    const { app, category, write } = await setup();
+    const a = category('盈利甲'),
+      b = category('盈利乙'),
+      c = category('亏损丙');
+    write(a.id, '2026-09-11', '1100');
+    write(b.id, '2026-09-11', '1050');
+    write(c.id, '2026-09-11', '800');
+    const report = (
+      await app.inject({ url: '/api/v1/reports?period=month&anchor=2026-09-13' })
+    ).json<ReportResponse>();
+    expect(report.commentary.join('')).toContain('2 个分类盈利，1 个分类亏损');
+    expect(report.commentary.join('')).toContain('66.7%');
+    expect(report.commentary.join('')).toContain('“亏损丙”是本期主要亏损来源');
+    expect(report.commentary.join('')).not.toMatch(/跑赢|排名|市场|指数/);
+    expect(report.summary.periodPnl).toBe('-50.00');
+  });
+  it('includes archived historical results and distinguishes a no-record report', async () => {
+    const { app, service, category, write } = await setup();
+    const a = category('旧分类', '2026-08-01');
+    write(a.id, '2026-08-30', '1100');
+    write(a.id, '2026-08-31', '0', '0', '1100');
+    service.updateCategory(a.id, {
+      revision: service.listCategories().items[0]!.revision,
+      archivedOn: '2026-08-31',
+    });
+    const past = (
+      await app.inject({ url: '/api/v1/reports?period=month&anchor=2026-08-01' })
+    ).json<ReportResponse>();
+    expect(past.categories[0]?.pnl).toBe('100.00');
+    expect(past.recordCount).toBe(2);
+    category('新分类');
+    const current = (
+      await app.inject({ url: '/api/v1/reports?period=month&anchor=2026-09-13' })
+    ).json<ReportResponse>();
+    expect(current.categories).toHaveLength(1);
+    expect(current.recordCount).toBe(0);
+    expect(current.commentary.join('')).toContain('没有录入记录');
   });
   it('sums category profits and compounds the portfolio instead of averaging category returns', async () => {
     const { category, write, get } = await setup();

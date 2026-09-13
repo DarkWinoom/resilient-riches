@@ -24,6 +24,28 @@ export interface CategoryDetailResponse {
   records: (EntryRecord & { pnl: string; returnRate: string | null })[];
 }
 
+export interface ReportCategory {
+  id: string;
+  name: string;
+  color: string;
+  pnl: string;
+  endingBalance: string;
+  returnRate: string | null;
+  lastRecordedDate: string | null;
+}
+export interface ReportResponse {
+  today: string;
+  period: Period;
+  anchor: string;
+  range: DateRange;
+  current: boolean;
+  summary: PerformanceSummary;
+  curve: CurvePoint[];
+  categories: ReportCategory[];
+  recordCount: number;
+  commentary: string[];
+}
+
 export interface CategoryValues {
   name: string;
   color: string;
