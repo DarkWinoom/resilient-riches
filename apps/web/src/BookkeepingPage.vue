@@ -14,8 +14,10 @@ import PeriodPicker from './components/dashboard/PeriodPicker.vue';
 import ReturnChart from './components/dashboard/ReturnChart.vue';
 import AllocationBars from './components/dashboard/AllocationBars.vue';
 import CategoryDetail from './components/dashboard/CategoryDetail.vue';
+import ReportDrawer from './components/reports/ReportDrawer.vue';
 const { data, period, anchor, today, loading, error, items, load, choose } = useDashboard();
 const drawer = ref(false),
+  reportOpen = ref(false),
   entry = ref(false),
   initialId = ref<string | null>(null),
   detailId = ref<string | null>(null),
@@ -54,6 +56,7 @@ async function record(id: string | null = null, date?: string) {
     :has-categories="!!items.length"
     @manage="manage()"
     @record="record()"
+    @report="reportOpen = true"
   />
   <main class="workspace dashboard-workspace">
     <div class="page-heading">
@@ -144,6 +147,14 @@ async function record(id: string | null = null, date?: string) {
       </section></template
     ><AppFooter />
   </main>
+  <ReportDrawer
+    v-if="reportOpen"
+    :initial-period="data?.period ?? period"
+    :initial-anchor="data?.anchor ?? today"
+    :today="today"
+    :private-mode="privateMode"
+    @close="reportOpen = false"
+  />
   <CategoryDrawer
     v-if="drawer"
     :items="items"

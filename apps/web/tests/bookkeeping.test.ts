@@ -10,6 +10,8 @@ import CategoryDrawer from '../src/components/CategoryDrawer.vue';
 import EntryDialog from '../src/components/EntryDialog.vue';
 import EntryCalendar from '../src/components/EntryCalendar.vue';
 import BaseOverlay from '../src/components/ui/BaseOverlay.vue';
+import ReportDrawer from '../src/components/reports/ReportDrawer.vue';
+import ShareDialog from '../src/components/reports/ShareDialog.vue';
 import { lastEntryLabel } from '../src/utils/format.ts';
 
 let server: Awaited<ReturnType<typeof createApp>>;
@@ -68,6 +70,75 @@ function button(text: string) {
 }
 
 describe('bookkeeping UI with real ledger API', () => {
+  it('opens the matching daily report and closes changed report filters without confirmation', async () => {
+    await create();
+    wrapper = mount(BookkeepingPage, { global });
+    await settle();
+    await button('日').trigger('click');
+    await settle();
+    await button('收益报表').trigger('click');
+    await settle();
+    expect(wrapper.get('.report-title').text()).toContain('收益日报');
+    const report = wrapper.getComponent(ReportDrawer);
+    await report.findAll('.period-segment button')[3]!.trigger('click');
+    await settle();
+    expect(report.get('.report-title').text()).toContain('收益年报');
+    await report.get('[aria-label="关闭收益报表"]').trigger('click');
+    expect(wrapper.findAll('dialog')).toHaveLength(0);
+  });
+  it('updates share privacy in the preview and closes it directly while retaining the report', async () => {
+    const category = await create();
+    await api.saveEntries(today, [
+      {
+        categoryId: category.id,
+        categoryRevision: 1,
+        revision: null,
+        closingBalance: '1100',
+        buy: '0',
+        sell: '0',
+        note: '不应出现在分享图',
+      },
+    ]);
+    wrapper = mount(ReportDrawer, {
+      props: { initialPeriod: 'month', initialAnchor: today, today, privateMode: false },
+      global,
+    });
+    await settle();
+    await button('分享收益').trigger('click');
+    const share = wrapper.getComponent(ShareDialog);
+    let svg = decodeURIComponent(share.get('img').attributes('src')!.split(',').slice(1).join(','));
+    expect(svg).toContain('1,100.00');
+    expect(svg).not.toContain('不应出现在分享图');
+    await share.findAll('[role="switch"]')[0]!.trigger('click');
+    await share.findAll('[role="switch"]')[1]!.trigger('click');
+    svg = decodeURIComponent(share.get('img').attributes('src')!.split(',').slice(1).join(','));
+    expect(svg).not.toContain('1,100.00');
+    expect(svg).not.toContain('稳健理财');
+    expect(svg).toContain('+10.00%');
+    await share.get('[aria-label="关闭分享收益"]').trigger('click');
+    expect(wrapper.findAll('dialog')).toHaveLength(1);
+    expect(wrapper.find('.confirmation-overlay').exists()).toBe(false);
+  });
+  it('keeps sharing options after export failure and allows a direct close', async () => {
+    Object.defineProperty(document, 'fonts', {
+      configurable: true,
+      value: { ready: Promise.resolve() },
+    });
+    await create();
+    const report = await api.report('month', today);
+    wrapper = mount(ShareDialog, { props: { report, initialPrivate: false }, global });
+    await wrapper.findAll('[role="switch"]')[0]!.trigger('click');
+    vi.spyOn(URL, 'createObjectURL').mockImplementation(() => {
+      throw new Error('图片生成失败，请重试。');
+    });
+    await button('保存 PNG').trigger('click');
+    await settle();
+    expect(wrapper.get('[role="alert"]').text()).toContain('图片生成失败');
+    expect(wrapper.findAll('[role="switch"]')[0]!.attributes('aria-checked')).toBe('true');
+    await wrapper.get('[aria-label="关闭分享收益"]').trigger('click');
+    expect(wrapper.emitted('close')).toHaveLength(1);
+    expect(wrapper.find('.confirmation-overlay').exists()).toBe(false);
+  });
   it('keeps summary cards fixed across periods and hides monetary details in privacy mode', async () => {
     const category = await create();
     await api.saveEntries(today, [

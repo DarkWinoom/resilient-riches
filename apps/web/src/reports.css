@@ -1,0 +1,231 @@
+.report-drawer {
+  width: 800px;
+}
+.report-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 24px 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  scrollbar-width: thin;
+}
+.report-body > .period-controls {
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+.report-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 20px;
+}
+.report-title h2 {
+  font-size: 26px;
+  margin-top: 9px;
+}
+.report-eyebrow {
+  font-size: 14px;
+  letter-spacing: 2px;
+  color: var(--gold);
+}
+.report-title > .muted {
+  font-size: 14px;
+}
+.report-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  padding: 24px 20px;
+  background: #f7f4ed;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+.report-metrics > div {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.report-metrics span {
+  color: var(--muted);
+}
+.report-metrics strong {
+  font-size: 26px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+.report-recency {
+  color: var(--muted);
+  font-size: 14px;
+  margin-top: -12px;
+}
+.report-commentary {
+  background: #fcfaf5;
+  border-left: 3px solid #b39558;
+  border-radius: 0 10px 10px 0;
+  padding: 18px 20px;
+}
+.report-commentary h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.report-commentary p {
+  font-size: 14px;
+  line-height: 1.85;
+  color: #746a58;
+}
+.report-body > .return-panel {
+  flex-shrink: 0;
+  height: 320px;
+}
+.report-categories .section-heading {
+  margin-bottom: 14px;
+}
+.report-categories table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.report-categories th {
+  background: #f8f6f1;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 400;
+  text-align: right;
+  padding: 13px 12px;
+}
+.report-categories td {
+  padding: 16px 12px;
+  border-bottom: 1px solid #eee9e0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.report-categories th:first-child,
+.report-categories td:first-child {
+  width: 45%;
+  text-align: left;
+}
+.report-categories .color-dot {
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 8px;
+}
+.share-overlay {
+  width: 940px;
+}
+.share-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+  padding: 20px 26px;
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+.share-toggles {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+.share-preview {
+  min-height: 0;
+  overflow: auto;
+  background: #ebe7df;
+  padding: 24px;
+  scrollbar-width: thin;
+}
+.share-preview img {
+  display: block;
+  max-width: 100%;
+  width: min(100%, 760px);
+  height: auto;
+  margin: 0 auto;
+  box-shadow: 0 8px 24px #302a2512;
+}
+.share-preview.actual img {
+  max-width: none;
+  width: 900px;
+}
+.share-message {
+  margin: 0;
+  padding: 12px 26px;
+  border-radius: 0;
+  flex-shrink: 0;
+}
+.share-overlay > .overlay-footer {
+  margin-top: auto;
+}
+.report-body .error-banner {
+  flex-shrink: 0;
+}
+.report-body .chart-panel {
+  min-height: 320px;
+}
+@media (max-width: 680px) {
+  .topbar-actions {
+    width: 100%;
+    justify-content: flex-end;
+    gap: 12px;
+  }
+  .topbar-actions .button {
+    padding: 10px 8px;
+    gap: 6px;
+  }
+  .report-drawer {
+    width: calc(100vw - 20px);
+  }
+  .report-body {
+    padding: 22px 18px;
+    gap: 22px;
+  }
+  .report-title {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .report-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 18px;
+    gap: 20px;
+  }
+  .report-metrics > div:last-child {
+    grid-column: 1/-1;
+  }
+  .report-metrics strong {
+    font-size: 24px;
+  }
+  .report-commentary {
+    padding: 16px;
+  }
+  .report-categories th,
+  .report-categories td {
+    padding: 14px 8px;
+  }
+  .report-categories th:first-child,
+  .report-categories td:first-child {
+    width: 42%;
+  }
+  .share-controls {
+    padding: 16px 18px;
+    flex-wrap: wrap;
+    gap: 14px;
+  }
+  .share-toggles {
+    gap: 18px;
+  }
+  .share-preview {
+    padding: 10px;
+  }
+  .share-message {
+    padding: 12px 18px;
+  }
+  .share-controls > .text-button {
+    margin-left: auto;
+  }
+}

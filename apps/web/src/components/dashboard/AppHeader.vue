@@ -2,7 +2,7 @@
 import AppButton from '../ui/AppButton.vue';
 import AppIcon from '../ui/AppIcon.vue';
 defineProps<{ disabled: boolean; hasCategories: boolean }>();
-defineEmits<{ manage: []; record: [] }>();
+defineEmits<{ manage: []; record: []; report: [] }>();
 </script>
 <template>
   <header class="topbar">
@@ -18,6 +18,8 @@ defineEmits<{ manage: []; record: [] }>();
           :disabled="disabled"
           @click="$emit('manage')"
           ><AppIcon name="squares-four" />分类管理</AppButton
+        ><AppButton variant="quiet" :disabled="disabled" @click="$emit('report')"
+          ><AppIcon name="chart-bar" />收益报表</AppButton
         ><AppButton
           variant="primary"
           :disabled="disabled || !hasCategories"

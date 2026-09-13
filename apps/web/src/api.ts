@@ -1,5 +1,6 @@
 import type {
   DashboardResponse,
+  ReportResponse,
   CategoryDetailResponse,
   Period,
   ApiFailure,
@@ -55,6 +56,13 @@ export function errorMessage(error: unknown): string {
 }
 
 export const api = {
+  report: (period: Period, anchor: string, signal?: AbortSignal) =>
+    request<ReportResponse>(
+      `/reports?period=${period}&anchor=${encodeURIComponent(anchor)}`,
+      'GET',
+      undefined,
+      signal,
+    ),
   dashboard: (period: Period, anchor: string, signal?: AbortSignal) =>
     request<DashboardResponse>(
       `/dashboard?period=${period}&anchor=${encodeURIComponent(anchor)}`,
