@@ -45,13 +45,11 @@ export function registerLedgerRoutes(app: FastifyInstance, database: AppDatabase
   });
   app.setErrorHandler((error, request, reply) => {
     if (error instanceof ApiError || error instanceof LedgerError) {
-      return reply
-        .code(error instanceof ApiError ? error.status : 400)
-        .send({
-          code: error.code,
-          message: error.message,
-          ...(error.field ? { fields: { [error.field]: error.message } } : {}),
-        });
+      return reply.code(error instanceof ApiError ? error.status : 400).send({
+        code: error.code,
+        message: error.message,
+        ...(error.field ? { fields: { [error.field]: error.message } } : {}),
+      });
     }
     const failure = error as {
       validation?: { instancePath?: string; params?: { missingProperty?: string } }[];

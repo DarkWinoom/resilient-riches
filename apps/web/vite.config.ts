@@ -22,7 +22,9 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 5173,
       strictPort: true,
-      proxy: { '/api': `http://${proxyHost}:${env.RR_PORT || '8080'}` },
+      proxy: {
+        '/api': { target: `http://${proxyHost}:${env.RR_PORT || '8080'}`, changeOrigin: false },
+      },
     },
   };
 });

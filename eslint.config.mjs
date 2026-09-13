@@ -14,10 +14,14 @@ export default tseslint.config(
       'vue/multi-word-component-names': ['error', { ignores: ['App'] }],
       'vue/max-attributes-per-line': 'off',
       'vue/singleline-html-element-content-newline': 'off',
+      'vue/multiline-html-element-content-newline': 'off',
+      'vue/html-closing-bracket-newline': 'off',
+      'vue/html-indent': 'off',
+      'vue/html-self-closing': 'off',
     },
   },
   {
     files: ['**/*.{ts,vue}'],
-    rules: { '@typescript-eslint/consistent-type-imports': 'error' },
+    rules: { 'no-undef': 'off', '@typescript-eslint/consistent-type-imports': 'error' },
   },
 );

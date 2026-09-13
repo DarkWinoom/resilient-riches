@@ -5,3 +5,4 @@ coverage/
 data/
 .pnpm-store/
 pnpm-lock.yaml
+apps/web/public/icons/
