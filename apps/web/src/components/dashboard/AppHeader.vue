@@ -1,0 +1,30 @@
+<script setup lang="ts">
+import AppButton from '../ui/AppButton.vue';
+import AppIcon from '../ui/AppIcon.vue';
+defineProps<{ disabled: boolean; hasCategories: boolean }>();
+defineEmits<{ manage: []; record: [] }>();
+</script>
+<template>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="/" aria-label="稳健生财首页"
+        ><span class="brand-mark"><AppIcon name="chart-bar" /></span
+        ><span><strong>稳健生财</strong><span class="brand-en">RESILIENT RICHES</span></span></a
+      >
+      <nav class="topbar-actions" aria-label="记账操作">
+        <AppButton
+          data-overlay-fallback
+          variant="quiet"
+          :disabled="disabled"
+          @click="$emit('manage')"
+          ><AppIcon name="squares-four" />分类管理</AppButton
+        ><AppButton
+          variant="primary"
+          :disabled="disabled || !hasCategories"
+          @click="$emit('record')"
+          ><AppIcon name="plus" />记录今日</AppButton
+        >
+      </nav>
+    </div>
+  </header>
+</template>

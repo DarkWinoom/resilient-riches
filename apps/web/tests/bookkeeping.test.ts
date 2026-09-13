@@ -68,6 +68,115 @@ function button(text: string) {
 }
 
 describe('bookkeeping UI with real ledger API', () => {
+  it('keeps summary cards fixed across periods and hides monetary details in privacy mode', async () => {
+    const category = await create();
+    await api.saveEntries(today, [
+      {
+        categoryId: category.id,
+        categoryRevision: 1,
+        revision: null,
+        closingBalance: '1100',
+        buy: '0',
+        sell: '0',
+        note: '',
+      },
+    ]);
+    wrapper = mount(BookkeepingPage, { global });
+    await settle();
+    const cards = wrapper.get('.summary-grid').text();
+    await button('日').trigger('click');
+    await settle();
+    expect(wrapper.get('.summary-grid').text()).toBe(cards);
+    expect(wrapper.get('thead').text()).toContain('当日收益');
+    await button('年').trigger('click');
+    await settle();
+    expect(wrapper.get('.summary-grid').text()).toBe(cards);
+    await button('收益金额').trigger('click');
+    expect(wrapper.get('.return-plot').attributes('aria-label')).toContain('收益金额');
+    await wrapper.get('[aria-label="隐藏金额"]').trigger('click');
+    expect(wrapper.get('.summary-grid').text()).not.toContain('1,100.00');
+    expect(wrapper.get('.allocation-panel').text()).not.toContain('1,100.00');
+    expect(wrapper.get('.holdings-table').text()).not.toContain('1,100.00');
+    expect(wrapper.get('.return-plot').attributes('aria-label')).toContain('收益率');
+    await wrapper.get('.return-plot').trigger('keydown', { key: 'End' });
+    expect(wrapper.get('.chart-tooltip').text()).toContain('10.00%');
+    expect(wrapper.get('.chart-tooltip').text()).not.toContain('当日余额');
+  });
+  it('opens a real historical entry from details and refreshes the dashboard after editing', async () => {
+    const category = await create();
+    await api.saveEntries('2026-09-11', [
+      {
+        categoryId: category.id,
+        categoryRevision: 1,
+        revision: null,
+        closingBalance: '1050',
+        buy: '0',
+        sell: '0',
+        note: '',
+      },
+    ]);
+    wrapper = mount(BookkeepingPage, { global });
+    await settle();
+    await wrapper.get('.holding-name').trigger('click');
+    await settle();
+    expect(wrapper.get('.detail-record').text()).toContain('2026-09-11');
+    await button('修改记录').trigger('click');
+    await settle();
+    expect(wrapper.get('.calendar-day.active').attributes('aria-label')).toContain('2026-09-11');
+    await wrapper.get('#entry-balance').setValue('1075');
+    await button('保存当日记录').trigger('click');
+    await settle();
+    expect(wrapper.get('.asset-card').text()).toContain('1,075.00');
+    expect(wrapper.get('.summary-grid').text()).toContain('+125.00');
+    expect(wrapper.get('.holdings-table').text()).toContain('+75.00');
+  });
+  it('sorts by category profit and returns to saved category order', async () => {
+    const a = await create('稳健理财'),
+      b = await create('长期成长');
+    await api.saveEntries(today, [
+      {
+        categoryId: a.id,
+        categoryRevision: 1,
+        revision: null,
+        closingBalance: '1010',
+        buy: '0',
+        sell: '0',
+        note: '',
+      },
+      {
+        categoryId: b.id,
+        categoryRevision: 1,
+        revision: null,
+        closingBalance: '1100',
+        buy: '0',
+        sell: '0',
+        note: '',
+      },
+    ]);
+    wrapper = mount(BookkeepingPage, { global });
+    await settle();
+    await button('本月收益').trigger('click');
+    expect(wrapper.findAll('tbody tr')[0]?.text()).toContain('长期成长');
+    await button('本月收益').trigger('click');
+    expect(wrapper.findAll('tbody tr')[0]?.text()).toContain('稳健理财');
+    await button('本月收益').trigger('click');
+    expect(wrapper.findAll('thead th')[2]?.attributes('aria-sort')).toBe('none');
+    expect(wrapper.findAll('tbody tr')[0]?.text()).toContain('稳健理财');
+  });
+  it('preserves the shown period with a visible retry message when a filter request fails', async () => {
+    await create();
+    wrapper = mount(BookkeepingPage, { global });
+    await settle();
+    vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('offline'));
+    await button('周').trigger('click');
+    await settle();
+    expect(wrapper.get('[role="alert"]').text()).toContain('当前仍显示 2026-09-01 — 2026-09-13');
+    expect(wrapper.get('thead').text()).toContain('本月收益');
+    await button('重试').trigger('click');
+    await settle();
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false);
+    expect(wrapper.get('thead').text()).toContain('本周收益');
+  });
   it('refreshes the business date before opening a record from an overnight page', async () => {
     await create();
     wrapper = mount(BookkeepingPage, { global });

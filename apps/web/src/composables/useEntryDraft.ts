@@ -14,9 +14,14 @@ export interface EntryDraft {
   values: EntryWrite;
   dirty: boolean;
 }
-export function useEntryDraft(today: string, initialId: string | null, changed: () => void) {
-  const date = ref(today),
-    month = ref(today.slice(0, 7)),
+export function useEntryDraft(
+  today: string,
+  initialId: string | null,
+  changed: () => void,
+  initialDate = today,
+) {
+  const date = ref(initialDate),
+    month = ref(initialDate.slice(0, 7)),
     selectedId = ref<string | null>(initialId);
   const cache = ref<Record<string, EntryDraft[]>>({});
   const calendar = ref<CalendarResponse | null>(null);

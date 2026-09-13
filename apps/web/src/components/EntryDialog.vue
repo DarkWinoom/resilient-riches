@@ -8,7 +8,7 @@ import AppButton from './ui/AppButton.vue';
 import AppTabs from './ui/AppTabs.vue';
 import BaseOverlay from './ui/BaseOverlay.vue';
 import ConfirmDialog from './ui/ConfirmDialog.vue';
-const props = defineProps<{ today: string; initialId: string | null }>();
+const props = defineProps<{ today: string; initialId: string | null; initialDate?: string }>();
 const emit = defineEmits<{ close: []; changed: [] }>();
 const { pending, ask, finish } = useConfirm();
 const {
@@ -34,7 +34,7 @@ const {
   changeDate,
   changeMonth,
   loadCalendar,
-} = useEntryDraft(props.today, props.initialId, () => emit('changed'));
+} = useEntryDraft(props.today, props.initialId, () => emit('changed'), props.initialDate);
 const tabs = computed(() =>
   drafts.value.map((item) => ({
     id: item.values.categoryId,

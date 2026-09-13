@@ -1,4 +1,7 @@
 import type {
+  DashboardResponse,
+  CategoryDetailResponse,
+  Period,
   ApiFailure,
   CalendarResponse,
   CategoryListResponse,
@@ -52,6 +55,20 @@ export function errorMessage(error: unknown): string {
 }
 
 export const api = {
+  dashboard: (period: Period, anchor: string, signal?: AbortSignal) =>
+    request<DashboardResponse>(
+      `/dashboard?period=${period}&anchor=${encodeURIComponent(anchor)}`,
+      'GET',
+      undefined,
+      signal,
+    ),
+  detail: (id: string, period: Period, anchor: string, signal?: AbortSignal) =>
+    request<CategoryDetailResponse>(
+      `/categories/${encodeURIComponent(id)}/detail?period=${period}&anchor=${encodeURIComponent(anchor)}`,
+      'GET',
+      undefined,
+      signal,
+    ),
   categories: (signal?: AbortSignal) =>
     request<CategoryListResponse>('/categories', 'GET', undefined, signal),
   createCategory: (values: CategoryValues) => request<CategoryView>('/categories', 'POST', values),
