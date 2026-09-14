@@ -3,6 +3,7 @@ import { computed, ref, useTemplateRef } from 'vue';
 import type { CategoryValues, CategoryView } from '@resilient-riches/core';
 import { api, errorMessage, RequestError } from '../api.ts';
 import { useConfirm } from '../composables/useConfirm.ts';
+import { useToast } from '../composables/useToast.ts';
 import { categoryErrors } from '../utils/forms.ts';
 import CategoryForm from './CategoryForm.vue';
 import AppButton from './ui/AppButton.vue';
@@ -15,6 +16,7 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ close: []; changed: [] }>();
 const { pending, ask, finish } = useConfirm();
+const { success } = useToast();
 const selected = ref(props.items.find((item) => item.id === props.initialId) ?? null);
 function defaults(): CategoryValues {
   return selected.value
@@ -113,6 +115,7 @@ async function save() {
         revision: selected.value.revision,
       });
     else await api.createCategory(values.value);
+    success(selected.value ? '分类已修改' : '分类已新增');
     completed();
   } catch (failure) {
     failed(failure);
@@ -143,6 +146,7 @@ async function archive() {
       revision: item.revision,
       archivedOn: item.archivedOn ? null : props.today,
     });
+    success(item.archivedOn ? '分类已恢复' : '分类已归档');
     completed();
   } catch (failure) {
     failed(failure);
@@ -167,6 +171,7 @@ async function remove() {
     )
       return;
     await api.deleteCategory(item.id, impact.category.revision);
+    success('分类已删除');
     completed();
   } catch (failure) {
     failed(failure);
@@ -184,6 +189,7 @@ async function remove() {
     ><div class="drawer-body">
       <form id="category-form" ref="form" @submit.prevent="save">
         <CategoryForm
+          :today="today"
           :model-value="values"
           :errors="errors"
           :disabled="busy"

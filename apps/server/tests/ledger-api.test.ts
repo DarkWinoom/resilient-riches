@@ -57,6 +57,27 @@ describe('ledger write API', () => {
   const save = (app: App, date: string, entries: EntryWrite[]) =>
     app.inject({ method: 'PUT', url: '/api/v1/entries/batch', payload: { date, entries } });
 
+  it('counts complete days against categories active on that date', async () => {
+    const app = await setup();
+    const a = await create(app, '已归档', { openingBalance: '0', historicalPnl: '0' });
+    await app.inject({
+      method: 'PATCH',
+      url: `/api/v1/categories/${a.id}`,
+      payload: { revision: a.revision, archivedOn: '2026-09-05' },
+    });
+    await create(app, '后来启用', { openingDate: '2026-09-06' });
+    await create(app, '持续持有');
+    await save(app, '2026-09-04', [write(await day(app, '2026-09-04'), 0)]);
+    const calendar = async () =>
+      (await app.inject({ url: '/api/v1/calendar?month=2026-09' })).json();
+    expect((await calendar()).days).toEqual([{ date: '2026-09-04', count: 1, total: 2 }]);
+    await save(app, '2026-09-04', [write(await day(app, '2026-09-04'), 1)]);
+    await save(app, '2026-09-06', [write(await day(app, '2026-09-06'), 0)]);
+    expect((await calendar()).days).toEqual([
+      { date: '2026-09-04', count: 2, total: 2 },
+      { date: '2026-09-06', count: 1, total: 2 },
+    ]);
+  });
   it('creates, lists, edits and rejects duplicate category names', async () => {
     const app = await setup();
     const item = await create(app, '  稳健理财  ');
@@ -127,7 +148,7 @@ describe('ledger write API', () => {
     expect((await day(app, '2026-09-13')).items[0]?.openingBalance).toBe('10200.00');
     expect(
       (await app.inject({ method: 'GET', url: '/api/v1/calendar?month=2026-09' })).json().days,
-    ).toEqual([{ date: '2026-09-04', count: 1 }]);
+    ).toEqual([{ date: '2026-09-04', count: 1, total: 1 }]);
   });
   it('rolls back the whole batch, including revisions, on an invalid item', async () => {
     const app = await setup();

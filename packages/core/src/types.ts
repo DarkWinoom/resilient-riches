@@ -18,7 +18,8 @@ export interface DailyEntry {
   note?: string;
 }
 
-export type RateReason = 'no_capital' | 'zero_capital_gain' | 'capital_reset';
+export type RateReason =
+  'no_capital' | 'zero_capital_gain' | 'capital_reset' | 'invalid_historical_capital';
 export interface DayResult {
   date: string;
   openingBalance: string;

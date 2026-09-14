@@ -44,7 +44,8 @@ describe('live money input', () => {
     expect((input.element as HTMLInputElement).value).toBe('12.00');
     await input.setValue('');
     await input.trigger('blur');
-    expect(wrapper.text()).toContain('请输入完整金额');
+    expect((input.element as HTMLInputElement).value).toBe('0.00');
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false);
     wrapper.unmount();
   });
   it('prevents invalid keyboard insertions before they change the value', async () => {

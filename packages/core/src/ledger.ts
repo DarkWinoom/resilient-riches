@@ -16,10 +16,37 @@ import type {
   DayResult,
   LedgerResult,
   LedgerSeries,
+  PerformanceSummary,
   RateReason,
   ReturnSegment,
 } from './types.ts';
 import { validateCategory, validateEntry } from './validation.ts';
+
+export function includeHistoricalReturn(
+  summary: PerformanceSummary,
+  categories: readonly Category[],
+): PerformanceSummary {
+  const opening = sumMoney(categories.map((category) => parseMoney(category.openingBalance)));
+  const history = sumMoney(categories.map((category) => parseMoney(category.historicalPnl)));
+  if (history === 0n) return summary;
+  const capital = opening - history;
+  if (capital <= 0n)
+    return { ...summary, returnRate: null, rateReason: 'invalid_historical_capital' };
+  if (opening === 0n) {
+    return {
+      ...summary,
+      returnRate: summary.returnRate === null && summary.rateReason === 'no_capital' ? '-1' : null,
+      rateReason:
+        summary.returnRate === null && summary.rateReason === 'no_capital' ? null : 'capital_reset',
+    };
+  }
+  if (summary.returnRate === null) return summary;
+  const rate = new FinancialDecimal(opening.toString())
+    .div(capital.toString())
+    .mul(new FinancialDecimal(summary.returnRate).plus(1))
+    .minus(1);
+  return { ...summary, returnRate: serializeRate(rate), rateReason: null };
+}
 
 interface InternalDay {
   date: string;

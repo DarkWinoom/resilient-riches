@@ -72,7 +72,7 @@ describe('period calendar and disabled explanations', () => {
   });
   it('explains the missing category and loading states while keeping the action disabled', async () => {
     wrapper = mount(AppHeader, { props: { disabled: false, hasCategories: false } });
-    const record = wrapper.findAll('button').find((item) => item.text() === '记录今日')!;
+    const record = wrapper.findAll('button').find((item) => item.text() === '记录盈亏')!;
     expect(record.attributes('data-disabled-reason')).toBe('请先在分类持仓中新增分类');
     expect(record.attributes('aria-description')).toContain('新增分类');
     await record.trigger('click');
@@ -90,7 +90,7 @@ describe('period calendar and disabled explanations', () => {
       {
         components: { AppButton, DisabledActionHint },
         template:
-          '<AppButton disabled disabled-reason="请先新增分类">记录今日</AppButton><DisabledActionHint />',
+          '<AppButton disabled disabled-reason="请先新增分类">记录盈亏</AppButton><DisabledActionHint />',
       },
       { attachTo: document.body },
     );

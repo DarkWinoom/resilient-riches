@@ -280,13 +280,17 @@ export function createLedgerService(database: AppDatabase, currentDate: () => st
       validateEntryDate(`${month}-01`, currentDate());
       const rows = database
         .prepare(
-          'SELECT date,count(*) AS count FROM daily_entries WHERE substr(date,1,7)=? GROUP BY date ORDER BY date',
+          'SELECT e.date,count(*) AS count,(SELECT count(*) FROM categories c WHERE c.opening_date<=e.date AND (c.archived_on IS NULL OR c.archived_on>=e.date)) AS total FROM daily_entries e WHERE substr(e.date,1,7)=? GROUP BY e.date ORDER BY e.date',
         )
         .all(month);
       return {
         month,
         today: currentDate(),
-        days: rows.map((row) => ({ date: String(row.date), count: Number(row.count) })),
+        days: rows.map((row) => ({
+          date: String(row.date),
+          count: Number(row.count),
+          total: Number(row.total),
+        })),
       };
     },
   };

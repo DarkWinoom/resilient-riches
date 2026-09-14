@@ -248,8 +248,15 @@ describe('bookkeeping UI with real ledger API', () => {
     await settle();
     await wrapper.get('.holding-name').trigger('click');
     await settle();
-    expect(wrapper.get('.detail-record').text()).toContain('2026-09-11');
-    await button('修改记录').trigger('click');
+    expect(wrapper.find('.detail-record').exists()).toBe(false);
+    expect(wrapper.find('.detail-chart').exists()).toBe(true);
+    await wrapper
+      .getComponent(CategoryDetail)
+      .findAll('button')
+      .find((item) => item.text() === '记录盈亏')!
+      .trigger('click');
+    await settle();
+    await wrapper.get('[aria-label^="2026-09-11，"]').trigger('click');
     await settle();
     expect(wrapper.get('.calendar-day.active').attributes('aria-label')).toContain('2026-09-11');
     await wrapper.get('#entry-balance').setValue('1075');
@@ -311,7 +318,7 @@ describe('bookkeeping UI with real ledger API', () => {
     wrapper = mount(BookkeepingPage, { global });
     await settle();
     businessDate = '2026-09-14';
-    await button('记录今日').trigger('click');
+    await button('记录盈亏').trigger('click');
     await settle();
     expect(wrapper.get('.calendar-day.active').attributes('aria-label')).toContain('2026-09-14');
   });
@@ -451,13 +458,13 @@ describe('bookkeeping UI with real ledger API', () => {
     await wrapper
       .getComponent(CategoryDetail)
       .findAll('button')
-      .find((item) => item.text() === '记录今日')!
+      .find((item) => item.text() === '记录盈亏')!
       .trigger('click');
     await settle();
     expect(wrapper.get('[role="tab"][aria-selected="true"]').text()).toContain('灵活现金');
     expect(wrapper.get('.calendar-day.active').attributes('aria-label')).toContain(today);
     expect((wrapper.get('#entry-balance').element as HTMLInputElement).value).toBe('1050.00');
-    expect(wrapper.text()).toContain('今日已录入');
+    expect(wrapper.text()).toContain('已录入');
   });
   it('protects unsaved day changes and saves all modified categories of the current date', async () => {
     const category = await create();
@@ -509,7 +516,7 @@ describe('bookkeeping UI with real ledger API', () => {
     await settle();
     expect((wrapper.get('#entry-balance').element as HTMLInputElement).value).toBe('1200.00');
   });
-  it('warns about unsaved drafts before deleting a daily entry and then closes', async () => {
+  it('deletes an entry while keeping the dialog and other category drafts', async () => {
     const category = await create();
     await create('灵活现金');
     await api.saveEntries(today, [
@@ -530,12 +537,14 @@ describe('bookkeeping UI with real ledger API', () => {
     await wrapper.findAll('[role="tab"]')[0]!.trigger('click');
     await button('删除本条记录').trigger('click');
     await settle();
-    expect(wrapper.text()).toContain('未保存的草稿也将放弃');
+    expect(wrapper.text()).toContain('其他分类未保存的草稿将保留');
     expect((await api.day(today)).items[0]?.entry).not.toBeNull();
     await button('删除记录').trigger('click');
     await settle();
     expect((await api.day(today)).items[0]?.entry).toBeNull();
-    expect(wrapper.emitted('close')).toHaveLength(1);
+    expect(wrapper.emitted('close')).toBeUndefined();
+    await wrapper.findAll('[role="tab"]')[1]!.trigger('click');
+    expect((wrapper.get('#entry-balance').element as HTMLInputElement).value).toBe('1080');
     expect(wrapper.emitted('changed')).toHaveLength(1);
   });
   it('leaves a fresh overlay immediately but confirms all edited-date drafts on Escape', async () => {
@@ -558,13 +567,13 @@ describe('bookkeeping UI with real ledger API', () => {
         today,
         date: today,
         month: '2026-09',
-        calendar: { today, month: '2026-09', days: [{ date: '2026-09-11', count: 2 }] },
+        calendar: { today, month: '2026-09', days: [{ date: '2026-09-11', count: 2, total: 2 }] },
         loading: false,
         disabled: false,
         error: '',
       },
     });
-    expect(wrapper.find('[aria-label="2026-09-11，2个分类有记录"]').exists()).toBe(true);
+    expect(wrapper.find('[aria-label="2026-09-11，2个分类有记录，全部录入"]').exists()).toBe(true);
     expect(wrapper.get('[aria-label="2026-09-14，无记录"]').attributes('disabled')).toBeDefined();
     await wrapper.get('.calendar-title').trigger('click');
     await wrapper.get('#calendar-year').setValue('2025');

@@ -26,7 +26,14 @@ defineProps<{ overview: DashboardResponse['overview']; privateMode: boolean }>()
         <span :class="amountTone(overview.current.returnRate ?? '0')">{{
           rateLabel(overview.current.returnRate)
         }}</span
-        ><span title="收益率为启用以来的复利收益率，不含无法推算的历史收益率">累计收益率</span>
+        ><span
+          :title="
+            overview.current.rateReason === 'invalid_historical_capital'
+              ? '初始金额减历史盈亏需大于零，才能计算累计收益率'
+              : '按初始金额减历史盈亏还原本金，再衔接启用后的复利收益率'
+          "
+          >累计收益率</span
+        >
       </div>
     </article>
     <article

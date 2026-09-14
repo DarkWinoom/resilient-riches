@@ -8,6 +8,7 @@ import type {
 } from '@resilient-riches/core';
 import { api, errorMessage } from '../api.ts';
 import { entryErrors } from '../utils/forms.ts';
+import { useToast } from './useToast.ts';
 
 export interface EntryDraft {
   reference: EntryDayItem;
@@ -17,9 +18,10 @@ export interface EntryDraft {
 export function useEntryDraft(
   today: string,
   initialId: string | null,
-  changed: () => void,
+  changed: (action: 'save' | 'delete') => void,
   initialDate = today,
 ) {
+  const { success } = useToast();
   const date = ref(initialDate),
     month = ref(initialDate.slice(0, 7)),
     selectedId = ref<string | null>(initialId);
@@ -179,7 +181,8 @@ export function useEntryDraft(
       accept(result, ids);
       touched.value = true;
       message.value = `已保存 ${ids.length} 个分类的记录`;
-      changed();
+      success(message.value);
+      changed('save');
     } catch (failure) {
       error.value = errorMessage(failure);
     } finally {
@@ -198,7 +201,9 @@ export function useEntryDraft(
       accept(result, [draft.values.categoryId]);
       touched.value = true;
       message.value = '记录已删除';
-      changed();
+      success('记录已删除');
+      changed('delete');
+      await loadCalendar();
     } catch (failure) {
       error.value = errorMessage(failure);
     } finally {

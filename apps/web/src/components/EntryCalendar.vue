@@ -41,6 +41,10 @@ function count(date: string) {
     ? (props.calendar.days.find((item) => item.date === date)?.count ?? 0)
     : 0;
 }
+function complete(date: string) {
+  const day = props.calendar?.days.find((item) => item.date === date);
+  return !!day && day.count > 0 && day.count === day.total;
+}
 function pickMonth(value: number) {
   emit('month', `${year.value}-${String(value).padStart(2, '0')}`);
   choosing.value = false;
@@ -118,17 +122,23 @@ function pickMonth(value: number) {
             :class="['calendar-day', { active: value === date, today: value === today }]"
             :disabled="disabled || value > today"
             :data-disabled-reason="disabled ? '正在保存，请稍候再切换日期' : '不能录入未来日期'"
-            :aria-label="`${value}${loading ? '' : count(value) ? `，${count(value)}个分类有记录` : '，无记录'}`"
+            :aria-label="`${value}${loading ? '' : count(value) ? `，${count(value)}个分类有记录，${complete(value) ? '全部录入' : '部分录入'}` : '，无记录'}`"
             :aria-pressed="value === date"
             @click="emit('date', value)"
           >
             {{ Number(value.slice(-2))
-            }}<span v-if="!loading && count(value)" class="record-dot"></span></button
+            }}<span v-if="!loading && count(value)" class="record-dots" aria-hidden="true"
+              ><span class="record-dot"></span
+              ><span v-if="complete(value)" class="record-dot"></span
+            ></span></button
           ><span v-else></span
         ></template></div
     ></template>
     <div class="calendar-legend">
-      <span class="record-dot"></span>有记录<button
+      <span class="legend-item"><span class="record-dot"></span>部分</span
+      ><span class="legend-item"
+        ><span class="record-dot"></span><span class="record-dot"></span>全部</span
+      ><button
         class="text-button"
         :disabled="disabled"
         :data-disabled-reason="disabled ? '正在保存，请稍候再切换日期' : undefined"

@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { useDashboard } from './composables/useDashboard.ts';
-import { lastEntryLabel } from './utils/format.ts';
 import CategoryDrawer from './components/CategoryDrawer.vue';
 import EntryDialog from './components/EntryDialog.vue';
 import CategoryTable from './components/CategoryTable.vue';
@@ -17,6 +16,7 @@ import CategoryDetail from './components/dashboard/CategoryDetail.vue';
 import ReportDrawer from './components/reports/ReportDrawer.vue';
 const { data, period, anchor, today, loading, error, items, load, choose } = useDashboard();
 const drawer = ref(false),
+  openingRecord = ref(false),
   reportOpen = ref(false),
   entry = ref(false),
   initialId = ref<string | null>(null),
@@ -41,8 +41,13 @@ function manage(id: string | null = null) {
   drawer.value = true;
 }
 async function record(id: string | null = null, date?: string) {
-  if (loading.value) return;
-  await load();
+  if (openingRecord.value) return;
+  openingRecord.value = true;
+  try {
+    await load();
+  } finally {
+    openingRecord.value = false;
+  }
   if (error.value || !today.value) return;
   detailId.value = null;
   initialId.value = id;
@@ -52,7 +57,7 @@ async function record(id: string | null = null, date?: string) {
 </script>
 <template>
   <AppHeader
-    :disabled="!today || loading"
+    :disabled="!data || openingRecord"
     :has-categories="!!items.length"
     @record="record()"
     @report="reportOpen = true"
@@ -71,8 +76,7 @@ async function record(id: string | null = null, date?: string) {
         </button>
       </div>
       <div v-if="today" class="page-date">
-        <span><AppIcon name="calendar-blank" />{{ today }}</span
-        ><span>{{ lastEntryLabel(data?.overview.current.lastRecordedDate ?? null, today) }}</span>
+        <span><AppIcon name="calendar-blank" />{{ today }}</span>
       </div>
     </div>
     <div v-if="!data" class="dashboard-initial">

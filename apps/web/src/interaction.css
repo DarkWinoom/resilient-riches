@@ -1,3 +1,113 @@
+.date-field-control {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: inherit;
+  font-size: 16px;
+}
+.date-field-control:hover:not(:disabled) {
+  border-color: var(--gold);
+}
+.toast-notice {
+  position: fixed;
+  inset: 24px auto auto 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 12px 20px;
+  max-width: calc(100vw - 32px);
+  border: 1px solid #dbc99f;
+  border-radius: 10px;
+  color: #665024;
+  background: #fffaf0;
+  box-shadow: 0 8px 28px #332b2420;
+  font-size: 14px;
+  pointer-events: none;
+}
+.toast-notice:popover-open {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.toast-notice::backdrop {
+  background: transparent;
+  pointer-events: none;
+}
+.entry-overlay {
+  height: min(820px, calc(100dvh - 40px));
+}
+.entry-overlay .entry-layout {
+  flex: 1;
+  min-height: 0;
+  scrollbar-gutter: stable;
+}
+.entry-overlay .entry-content {
+  padding-block: 20px;
+}
+.entry-overlay .tabs {
+  margin: 10px 0 16px;
+  height: 46px;
+  min-height: 46px;
+}
+.entry-overlay .tabs > button {
+  height: 40px;
+  padding: 6px 10px;
+}
+.entry-overlay .entry-panel {
+  min-height: 460px;
+}
+.entry-overlay .entry-reference {
+  min-height: 24px;
+}
+.entry-overlay .record-dots {
+  position: absolute;
+  bottom: 4px;
+  inset-inline: 0;
+  display: flex;
+  justify-content: center;
+  gap: 3px;
+}
+.entry-overlay .record-dots .record-dot {
+  position: static;
+}
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.page-date > span {
+  font-size: 16px;
+}
+.detail-chart {
+  height: 360px;
+  flex: 0 0 360px;
+}
+.detail-chart .chart-panel {
+  height: 100%;
+}
+.version-badge {
+  padding: 3px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--gold);
+  font-size: 14px;
+}
+@media (max-width: 680px) {
+  .entry-overlay {
+    height: calc(100dvh - 24px);
+  }
+  .entry-overlay .entry-panel {
+    min-height: 480px;
+  }
+  .entry-overlay .entry-content {
+    padding-block: 16px;
+  }
+}
 .category-count-heading {
   display: inline-flex;
   align-items: center;

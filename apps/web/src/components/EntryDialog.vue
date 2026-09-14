@@ -24,7 +24,6 @@ const {
   busy,
   error,
   calendarError,
-  message,
   errors,
   edit,
   save,
@@ -37,9 +36,9 @@ const {
 } = useEntryDraft(
   props.today,
   props.initialId,
-  () => {
+  (action) => {
     emit('changed');
-    emit('close');
+    if (action === 'save') emit('close');
   },
   props.initialDate,
 );
@@ -102,7 +101,7 @@ async function deleteRecord() {
   if (
     await ask({
       title: '删除这条记录？',
-      description: `将删除 ${date.value} 的“${active.value.reference.category.name}”记录，后续盈亏会重新计算。${dirtyCount.value ? '删除后窗口关闭，本窗口未保存的草稿也将放弃。' : ''}`,
+      description: `将删除 ${date.value} 的“${active.value.reference.category.name}”记录，后续盈亏会重新计算。其他分类未保存的草稿将保留。`,
       action: '删除记录',
       danger: true,
     })
@@ -131,7 +130,6 @@ async function deleteRecord() {
           <span v-if="dirtyCount" class="muted">{{ dirtyCount }} 个草稿待保存</span>
         </div>
         <AppTabs
-          v-if="tabs.length"
           v-model="selectedId"
           :items="tabs"
           label="选择分类"
@@ -164,7 +162,6 @@ async function deleteRecord() {
             >重新载入</AppButton
           >
         </div>
-        <p v-if="message" class="success-message" role="status">{{ message }}</p>
       </section>
     </div>
     <footer class="overlay-footer">

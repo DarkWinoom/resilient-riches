@@ -56,7 +56,8 @@ function beforeInput(event: InputEvent) {
 function update(event: Event) {
   const input = event.target as HTMLInputElement;
   if (props.money && (event as InputEvent).isComposing) return;
-  const value = props.money ? normalizeMoneyDraft(input.value) : input.value;
+  const cleared = props.money && !input.value.trim();
+  const value = props.money ? normalizeMoneyDraft(input.value) || '0' : input.value;
   const error = props.money ? moneyDraftError(value, props.signed) : '';
   if (error) {
     inputError.value = error;
@@ -67,6 +68,7 @@ function update(event: Event) {
   inputError.value = props.money && (!value || value === '-') ? '请输入完整金额' : '';
   if (input.value !== value) input.value = value;
   if (value !== props.modelValue) emit('update:modelValue', value);
+  if (cleared) input.select();
 }
 function finish() {
   if (!props.money || inputError.value) return;

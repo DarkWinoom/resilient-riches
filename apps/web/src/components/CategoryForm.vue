@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import type { CategoryValues } from '@resilient-riches/core';
 import AppField from './ui/AppField.vue';
-defineProps<{ modelValue: CategoryValues; errors: Record<string, string>; disabled: boolean }>();
+import DateField from './ui/DateField.vue';
+defineProps<{
+  modelValue: CategoryValues;
+  errors: Record<string, string>;
+  disabled: boolean;
+  today: string;
+}>();
 const emit = defineEmits<{ 'update:modelValue': [value: CategoryValues] }>();
 const palette = ['#b69a60', '#7c9a8a', '#8c9eae', '#be8f81', '#978bb0', '#c3b477'];
 function update(values: CategoryValues, key: keyof CategoryValues, value: string) {
@@ -41,12 +47,11 @@ function update(values: CategoryValues, key: keyof CategoryValues, value: string
       :error="errors.color"
       @update:model-value="update(modelValue, 'color', $event)"
     />
-    <AppField
+    <DateField
       id="category-date"
       label="启用日期"
-      placeholder="YYYY-MM-DD"
+      :today="today"
       :model-value="modelValue.openingDate"
-      required
       :disabled="disabled"
       :error="errors.openingDate"
       @update:model-value="update(modelValue, 'openingDate', $event)"

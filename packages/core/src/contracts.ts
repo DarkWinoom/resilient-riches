@@ -21,6 +21,7 @@ export interface DashboardResponse {
 export interface CategoryDetailResponse {
   category: DashboardCategory;
   range: DateRange;
+  curve: CurvePoint[];
   records: (EntryRecord & { pnl: string; returnRate: string | null })[];
 }
 
@@ -114,7 +115,7 @@ export interface EntryDayResponse {
 export interface CalendarResponse {
   month: string;
   today: string;
-  days: { date: string; count: number }[];
+  days: { date: string; count: number; total: number }[];
 }
 
 export interface DeletionImpact {

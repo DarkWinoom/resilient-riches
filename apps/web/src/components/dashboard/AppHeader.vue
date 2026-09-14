@@ -24,7 +24,7 @@ defineEmits<{ record: []; report: [] }>();
           :disabled="disabled || !hasCategories"
           :disabled-reason="disabled ? '账本暂未就绪，请稍候或重试' : '请先在分类持仓中新增分类'"
           @click="$emit('record')"
-          ><AppIcon name="plus" />记录今日</AppButton
+          ><AppIcon name="plus" />记录盈亏</AppButton
         >
       </nav>
     </div>

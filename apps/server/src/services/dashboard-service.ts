@@ -1,4 +1,4 @@
-import { calculateLedger, periodRange } from '@resilient-riches/core';
+import { calculateLedger, includeHistoricalReturn, periodRange } from '@resilient-riches/core';
 import type { DashboardResponse, CategoryDetailResponse, Period } from '@resilient-riches/core';
 import type { AppDatabase } from '../database/database.ts';
 import { loadLedgerInput } from '../database/ledger-input.ts';
@@ -31,7 +31,10 @@ export function createDashboardService(database: AppDatabase, clock: () => strin
       anchor,
       range,
       overview: {
-        current: current.portfolio.summary,
+        current: includeHistoricalReturn(
+          current.portfolio.summary,
+          input.categories.filter((category) => category.openingDate <= today),
+        ),
         today: daily.portfolio.summary,
         month: month.portfolio.summary,
       },
@@ -65,11 +68,13 @@ export function createDashboardService(database: AppDatabase, clock: () => strin
       from: data.range.from,
       through: data.range.to,
       timeline: 'period',
+      includeCurve: true,
     });
     const days = new Map(ledger.categories[0]!.days.map((day) => [day.date, day]));
     return {
       category,
       range: data.range,
+      curve: ledger.portfolio.curve ?? [],
       records: entries
         .filter((item) => item.date >= data.range.from && item.date <= data.range.to)
         .reverse()

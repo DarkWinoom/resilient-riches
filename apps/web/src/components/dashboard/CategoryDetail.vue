@@ -11,6 +11,7 @@ import {
 } from '../../utils/format.ts';
 import BaseOverlay from '../ui/BaseOverlay.vue';
 import AppButton from '../ui/AppButton.vue';
+import ReturnChart from './ReturnChart.vue';
 const props = defineProps<{
   id: string;
   period: Period;
@@ -83,27 +84,10 @@ onUnmounted(() => controller?.abort());
         <p v-if="data.category.note && !privateMode" class="detail-note">
           {{ data.category.note }}
         </p>
-        <div class="section-heading">
-          <h3>本期记录</h3>
-          <span class="muted">{{ data.records.length }} 条</span>
-        </div>
         <p class="muted">{{ data.range.from }} — {{ data.range.to }}</p>
-        <div v-if="!data.records.length" class="chart-empty">本期没有录入记录</div>
-        <div v-for="row in data.records" :key="row.id" class="detail-record">
-          <div>
-            <strong>{{ row.date }}</strong
-            ><span class="muted">{{
-              privateMode ? '••••' : `余额 ¥ ${moneyLabel(row.closingBalance)}`
-            }}</span>
-          </div>
-          <div>
-            <span :class="amountTone(row.pnl)">{{
-              privateMode ? rateLabel(row.returnRate) : signedMoney(row.pnl)
-            }}</span
-            ><AppButton variant="quiet" @click="$emit('record', id, row.date)">修改记录</AppButton>
-          </div>
-        </div></template
-      >
+        <div v-if="period !== 'day'" class="detail-chart">
+          <ReturnChart :points="data.curve" :private-mode="privateMode" :loading="loading" /></div
+      ></template>
     </div>
     <footer class="overlay-footer">
       <AppButton @click="$emit('close')">关闭</AppButton
@@ -112,7 +96,7 @@ onUnmounted(() => controller?.abort());
         :disabled="!data || !!data.category.archivedOn"
         :disabled-reason="!data ? '分类信息尚未加载，请等待或重试' : '分类已归档，请恢复后记录今天'"
         @click="$emit('record', id, today)"
-        >记录今日</AppButton
+        >记录盈亏</AppButton
       >
     </footer></BaseOverlay
   >

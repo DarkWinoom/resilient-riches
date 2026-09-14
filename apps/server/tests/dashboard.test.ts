@@ -66,7 +66,7 @@ describe('dashboard aggregation', () => {
     expect(current.overview.current).toMatchObject({
       closingBalance: '1210.00',
       cumulativePnl: '260.00',
-      returnRate: '0.21',
+      returnRate: '0.273684210526315789473684210526',
     });
     expect(current.overview.today).toMatchObject({ periodPnl: '0.00', returnRate: '0' });
     expect(current.overview.month).toMatchObject({ periodPnl: '110.00', returnRate: '0.1' });

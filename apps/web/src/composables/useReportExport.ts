@@ -2,8 +2,10 @@ import { onScopeDispose, ref } from 'vue';
 import type { ShareModel } from '../utils/share-model.ts';
 import { shareFilename } from '../utils/share-model.ts';
 import { renderShareSvg } from '../utils/share-svg.ts';
+import { useToast } from './useToast.ts';
 
 export function useReportExport() {
+  const { success: notify } = useToast();
   const exporting = ref(false),
     error = ref(''),
     success = ref(false);
@@ -49,6 +51,7 @@ export function useReportExport() {
       link.click();
       link.remove();
       success.value = true;
+      notify('图片已生成，已开始下载');
       const completedUrl = downloadUrl;
       setTimeout(() => URL.revokeObjectURL(completedUrl), 10000);
       downloadUrl = undefined;
