@@ -73,7 +73,7 @@ describe('period calendar and disabled explanations', () => {
   it('explains the missing category and loading states while keeping the action disabled', async () => {
     wrapper = mount(AppHeader, { props: { disabled: false, hasCategories: false } });
     const record = wrapper.findAll('button').find((item) => item.text() === '记录今日')!;
-    expect(record.attributes('data-disabled-reason')).toBe('请先在分类管理中新增分类');
+    expect(record.attributes('data-disabled-reason')).toBe('请先在分类持仓中新增分类');
     expect(record.attributes('aria-description')).toContain('新增分类');
     await record.trigger('click');
     expect(wrapper.emitted('record')).toBeUndefined();

@@ -377,19 +377,19 @@
   padding: 10px 22px;
 }
 .dashboard-table col {
-  width: 13%;
-}
-.dashboard-table .col-name {
-  width: 24%;
-}
-.dashboard-table .col-rate {
   width: 12%;
 }
+.dashboard-table .col-name {
+  width: auto;
+}
+.dashboard-table .col-rate {
+  width: 10%;
+}
 .dashboard-table .col-date {
-  width: 19%;
+  width: 112px;
 }
 .dashboard-table .col-action {
-  width: 6%;
+  width: 128px;
 }
 .dashboard-table th:first-child,
 .dashboard-table th:last-child {
@@ -414,6 +414,32 @@
 }
 .dashboard-table .holding-note {
   margin-top: 4px;
+}
+.dashboard-table .last-recorded {
+  white-space: nowrap;
+  text-align: right;
+}
+.dashboard-table .row-action {
+  text-align: right;
+}
+.table-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+}
+.table-action {
+  border: 0;
+  background: transparent;
+  color: var(--gold);
+  border-radius: 6px;
+  font-size: 14px;
+  min-height: 34px;
+  padding: 6px 8px;
+  transition: background 0.18s;
+}
+.table-action:hover {
+  background: #f3eddf;
 }
 .sort-button {
   background: none;
@@ -736,9 +762,11 @@
   }
   .dashboard-table td.last-recorded {
     font-size: 14px;
+    justify-content: space-between;
+    text-align: right;
   }
   .dashboard-table .holding-name {
-    padding-right: 28px;
+    padding-right: 94px;
   }
   .detail-metrics {
     padding: 18px;

@@ -26,3 +26,8 @@ export function lastEntryLabel(date: string | null, currentDate: string): string
   if (date === addDays(currentDate, -1)) return '上次录入：昨天';
   return `上次录入：${date}`;
 }
+export function recordingDateLabel(date: string | null, currentDate: string): string {
+  if (!date) return '—';
+  if (date === currentDate) return '今日';
+  return date.slice(0, 4) === currentDate.slice(0, 4) ? date.slice(5) : date;
+}

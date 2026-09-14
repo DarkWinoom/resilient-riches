@@ -1,12 +1,13 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { flushPromises, mount } from '@vue/test-utils';
+import { DOMWrapper, flushPromises, mount } from '@vue/test-utils';
 import type { VueWrapper } from '@vue/test-utils';
 import { createApp } from '../../server/src/app.ts';
 import { openDatabase } from '../../server/src/database/database.ts';
 import { api } from '../src/api.ts';
 import BookkeepingPage from '../src/BookkeepingPage.vue';
 import CategoryDrawer from '../src/components/CategoryDrawer.vue';
+import CategoryDetail from '../src/components/dashboard/CategoryDetail.vue';
 import EntryDialog from '../src/components/EntryDialog.vue';
 import EntryCalendar from '../src/components/EntryCalendar.vue';
 import BaseOverlay from '../src/components/ui/BaseOverlay.vue';
@@ -70,18 +71,26 @@ function button(text: string) {
 }
 
 describe('bookkeeping UI with real ledger API', () => {
-  it('shows the new-category shortcut only while editing a saved category', async () => {
-    const category = await create();
-    wrapper = mount(CategoryDrawer, {
-      props: { items: [category], today, initialId: null },
-      global,
-    });
-    expect(wrapper.findAll('button').some((item) => item.text() === '新增分类')).toBe(false);
-    await button('稳健理财').trigger('click');
-    await button('新增分类').trigger('click');
-    expect((wrapper.get('#category-name').element as HTMLInputElement).value).toBe('');
-    expect(wrapper.findAll('button').some((item) => item.text() === '新增分类')).toBe(false);
+  it('separates list actions, read-only details and a single-category editor', async () => {
+    await create();
+    wrapper = mount(BookkeepingPage, { global });
+    await settle();
+    expect(wrapper.get('.topbar-actions').text()).not.toContain('分类管理');
+    await wrapper.get('[aria-label="查看稳健理财"]').trigger('click');
+    await settle();
+    expect(wrapper.findComponent(CategoryDrawer).exists()).toBe(false);
+    expect(wrapper.find('dialog input').exists()).toBe(false);
+    await wrapper.get('[aria-label="关闭稳健理财"]').trigger('click');
+    await wrapper.get('[aria-label="编辑稳健理财"]').trigger('click');
+    expect((wrapper.get('#category-name').element as HTMLInputElement).value).toBe('稳健理财');
+    expect(wrapper.find('.category-picker').exists()).toBe(false);
+    await wrapper.get('#category-name').setValue('新名称');
+    await button('保存修改').trigger('click');
+    await settle();
+    expect(wrapper.findAll('dialog')).toHaveLength(0);
+    expect(wrapper.get('tbody').text()).toContain('新名称');
   });
+
   it('opens the matching daily report and closes changed report filters without confirmation', async () => {
     await create();
     wrapper = mount(BookkeepingPage, { global });
@@ -302,11 +311,11 @@ describe('bookkeeping UI with real ledger API', () => {
     wrapper = mount(BookkeepingPage, { global });
     await settle();
     businessDate = '2026-09-14';
-    await wrapper.get('[aria-label="为稳健理财记录今天"]').trigger('click');
+    await button('记录今日').trigger('click');
     await settle();
     expect(wrapper.get('.calendar-day.active').attributes('aria-label')).toContain('2026-09-14');
   });
-  it('reorders categories without making its own editor stale, then archives and restores a cleared category', async () => {
+  it('archives and restores a cleared category and closes after each confirmed mutation', async () => {
     const category = await api.createCategory({
       name: '已清空',
       color: '#b69a60',
@@ -315,34 +324,29 @@ describe('bookkeeping UI with real ledger API', () => {
       historicalPnl: '0',
       note: '',
     });
-    await create();
     wrapper = mount(CategoryDrawer, {
-      props: { items: (await api.categories()).items, today, initialId: category.id },
+      props: { items: [category], today, initialId: category.id },
       global,
-    });
-    await wrapper.get('#category-note').setValue('排序中保留编辑');
-    await wrapper.get('[aria-label="下移已清空"]').trigger('click');
-    await settle();
-    expect((wrapper.get('#category-note').element as HTMLTextAreaElement).value).toBe(
-      '排序中保留编辑',
-    );
-    await wrapper.get('#category-form').trigger('submit');
-    await settle();
-    expect((await api.categories()).items[1]).toMatchObject({
-      id: category.id,
-      note: '排序中保留编辑',
     });
     await button('归档分类').trigger('click');
     await settle();
     await wrapper.get('.confirmation-actions .button--primary').trigger('click');
     await settle();
-    expect((await api.categories()).items[1]?.archivedOn).toBe(today);
+    expect((await api.categories()).items[0]?.archivedOn).toBe(today);
+    expect(wrapper.emitted('close')).toHaveLength(1);
+    wrapper.unmount();
+    wrapper = mount(CategoryDrawer, {
+      props: { items: (await api.categories()).items, today, initialId: category.id },
+      global,
+    });
     await button('恢复分类').trigger('click');
     await settle();
     await wrapper.get('.confirmation-actions .button--primary').trigger('click');
     await settle();
-    expect((await api.categories()).items[1]?.archivedOn).toBeNull();
+    expect((await api.categories()).items[0]?.archivedOn).toBeNull();
+    expect(wrapper.emitted('close')).toHaveLength(1);
   });
+
   it('changes category tabs with the keyboard while retaining draft values', async () => {
     const category = await create();
     await create('灵活现金');
@@ -354,43 +358,48 @@ describe('bookkeeping UI with real ledger API', () => {
     await wrapper.get('[role="tablist"]').trigger('keydown', { key: 'Home' });
     expect((wrapper.get('#entry-note').element as HTMLTextAreaElement).value).toBe('保留备注');
   });
-  it('creates a category from the drawer and requires a close confirmation after saving', async () => {
-    wrapper = mount(CategoryDrawer, { props: { items: [], today, initialId: null }, global });
+  it('creates a category and closes immediately without a second confirmation', async () => {
+    wrapper = mount(BookkeepingPage, { global });
+    await settle();
+    await wrapper.get('.panel-actions .button').trigger('click');
     await wrapper.get('#category-name').setValue('稳健理财');
     await wrapper.get('#category-balance').setValue('1000');
-    await wrapper.get('#category-history').setValue('50');
+    await wrapper.get('#category-history').setValue('-50');
     await wrapper.get('#category-form').trigger('submit');
     await settle();
-    expect(wrapper.text()).toContain('分类已保存');
+    expect(wrapper.findAll('dialog')).toHaveLength(0);
+    expect(wrapper.get('tbody').text()).toContain('稳健理财');
     expect((await api.categories()).items[0]).toMatchObject({
-      name: '稳健理财',
       balance: '1000.00',
-      totalPnl: '50.00',
+      totalPnl: '-50.00',
     });
-    await wrapper.get('[aria-label="关闭分类管理"]').trigger('click');
-    await settle();
-    expect(wrapper.findAll('dialog')).toHaveLength(2);
-    expect(wrapper.emitted('close')).toBeUndefined();
-    await button('取消').trigger('click');
-    expect(wrapper.findAll('dialog')).toHaveLength(1);
   });
-  it('keeps invalid amounts unsaved and protects edited category drafts on switch', async () => {
-    const category = await create();
+
+  it('blocks invalid amounts and confirms only unsaved category changes on close', async () => {
     wrapper = mount(CategoryDrawer, {
-      props: { items: [category], today, initialId: null },
-      global,
+      props: { items: [], today, initialId: null },
+      attachTo: document.body,
     });
-    await wrapper.get('#category-name').setValue('新分类');
-    await wrapper.get('#category-balance').setValue('-1');
-    await wrapper.get('#category-form').trigger('submit');
-    expect(wrapper.text()).toContain('请输入有效金额');
-    expect((await api.categories()).items).toHaveLength(1);
-    await button('稳健理财').trigger('click');
+    const body = new DOMWrapper(document.body);
+    await body.get('#category-name').setValue('新分类');
+    await body.get('#category-balance').setValue('-1');
+    expect((body.get('#category-balance').element as HTMLInputElement).value).toBe('0.00');
+    expect(body.text()).toContain('不能为负数');
+    expect((body.get('#category-balance').element as HTMLInputElement).validity.valid).toBe(false);
+    await body.get('#category-form').trigger('submit');
     await settle();
-    expect(wrapper.text()).toContain('放弃当前修改？');
-    await button('取消').trigger('click');
-    expect((wrapper.get('#category-name').element as HTMLInputElement).value).toBe('新分类');
+    expect(body.text()).toContain('不能为负数');
+    expect((await api.categories()).items).toHaveLength(0);
+    await body.get('[aria-label="关闭新增分类"]').trigger('click');
+    await settle();
+    expect(body.text()).toContain('放弃未保存的修改');
+    await body
+      .findAll('button')
+      .find((item) => item.text() === '取消')!
+      .trigger('click');
+    expect((body.get('#category-name').element as HTMLInputElement).value).toBe('新分类');
   });
+
   it('confirms category deletion with record impact, supports cancellation and then deletion', async () => {
     const category = await create();
     await api.saveEntries(today, [
@@ -437,14 +446,20 @@ describe('bookkeeping UI with real ledger API', () => {
     ]);
     wrapper = mount(BookkeepingPage, { global });
     await settle();
-    await wrapper.get('[aria-label="为灵活现金记录今天"]').trigger('click');
+    await wrapper.get('[aria-label="查看灵活现金"]').trigger('click');
+    await settle();
+    await wrapper
+      .getComponent(CategoryDetail)
+      .findAll('button')
+      .find((item) => item.text() === '记录今日')!
+      .trigger('click');
     await settle();
     expect(wrapper.get('[role="tab"][aria-selected="true"]').text()).toContain('灵活现金');
     expect(wrapper.get('.calendar-day.active').attributes('aria-label')).toContain(today);
     expect((wrapper.get('#entry-balance').element as HTMLInputElement).value).toBe('1050.00');
     expect(wrapper.text()).toContain('今日已录入');
   });
-  it('preserves tabs and date drafts, submits only the selected date and refreshes the next baseline', async () => {
+  it('protects unsaved day changes and saves all modified categories of the current date', async () => {
     const category = await create();
     await create('灵活现金');
     wrapper = mount(EntryDialog, { props: { today, initialId: category.id }, global });
@@ -452,28 +467,21 @@ describe('bookkeeping UI with real ledger API', () => {
     await wrapper.get('#entry-balance').setValue('1100');
     await wrapper.findAll('[role="tab"]')[1]!.trigger('click');
     await wrapper.get('#entry-balance').setValue('1020');
-    await wrapper.findAll('[role="tab"]')[0]!.trigger('click');
-    expect((wrapper.get('#entry-balance').element as HTMLInputElement).value).toBe('1100');
     await wrapper.get('[aria-label^="2026-09-12，"]').trigger('click');
     await settle();
-    await wrapper.get('#entry-balance').setValue('1050');
+    expect(wrapper.text()).toContain('放弃当前日期');
+    await button('取消').trigger('click');
+    expect(wrapper.get('.calendar-day.active').attributes('aria-label')).toContain(today);
     await button('保存当日记录').trigger('click');
     await settle();
-    expect((await api.day(today)).items.every((item) => !item.entry)).toBe(true);
-    expect(wrapper.text()).toContain('2 个草稿待保存');
-    await wrapper.get('[aria-label^="2026-09-13，"]').trigger('click');
-    await settle();
-    expect((wrapper.get('#entry-balance').element as HTMLInputElement).value).toBe('1100');
-    expect(wrapper.get('.entry-reference').text()).toContain('1,050.00');
-    expect(wrapper.get('.entry-preview').text()).toContain('+50.00');
-    await button('保存当日记录').trigger('click');
-    await settle();
-    expect(wrapper.text()).toContain('已保存 2 个分类的记录');
-    expect((await api.calendar('2026-09')).days).toEqual([
-      { date: '2026-09-12', count: 1 },
-      { date: today, count: 2 },
+    expect(wrapper.emitted('close')).toHaveLength(1);
+    expect((await api.day(today)).items.map((item) => item.entry?.closingBalance)).toEqual([
+      '1100.00',
+      '1020.00',
     ]);
+    expect((await api.day('2026-09-12')).items.every((item) => !item.entry)).toBe(true);
   });
+
   it('retains a conflicted draft and reloads only after explicit confirmation', async () => {
     const category = await create();
     wrapper = mount(EntryDialog, { props: { today, initialId: category.id }, global });
@@ -501,7 +509,7 @@ describe('bookkeeping UI with real ledger API', () => {
     await settle();
     expect((wrapper.get('#entry-balance').element as HTMLInputElement).value).toBe('1200.00');
   });
-  it('deletes a daily entry only after confirmation and keeps other category drafts', async () => {
+  it('warns about unsaved drafts before deleting a daily entry and then closes', async () => {
     const category = await create();
     await create('灵活现金');
     await api.saveEntries(today, [
@@ -522,12 +530,13 @@ describe('bookkeeping UI with real ledger API', () => {
     await wrapper.findAll('[role="tab"]')[0]!.trigger('click');
     await button('删除本条记录').trigger('click');
     await settle();
+    expect(wrapper.text()).toContain('未保存的草稿也将放弃');
     expect((await api.day(today)).items[0]?.entry).not.toBeNull();
     await button('删除记录').trigger('click');
     await settle();
     expect((await api.day(today)).items[0]?.entry).toBeNull();
-    await wrapper.findAll('[role="tab"]')[1]!.trigger('click');
-    expect((wrapper.get('#entry-balance').element as HTMLInputElement).value).toBe('1080');
+    expect(wrapper.emitted('close')).toHaveLength(1);
+    expect(wrapper.emitted('changed')).toHaveLength(1);
   });
   it('leaves a fresh overlay immediately but confirms all edited-date drafts on Escape', async () => {
     const category = await create();

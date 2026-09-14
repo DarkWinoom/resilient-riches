@@ -54,7 +54,6 @@ async function record(id: string | null = null, date?: string) {
   <AppHeader
     :disabled="!today || loading"
     :has-categories="!!items.length"
-    @manage="manage()"
     @record="record()"
     @report="reportOpen = true"
   />
@@ -127,7 +126,7 @@ async function record(id: string | null = null, date?: string) {
             >
               <span class="switch-track"></span>显示归档</button
             ><AppButton variant="quiet" @click="manage()"
-              >管理分类<AppIcon name="caret-right"
+              >新增分类<AppIcon name="plus"
             /></AppButton>
           </div>
         </header>
@@ -137,8 +136,8 @@ async function record(id: string | null = null, date?: string) {
           :today="today"
           :period-label="label"
           :private-mode="privateMode"
-          @edit="detailId = $event"
-          @record="record"
+          @view="detailId = $event"
+          @edit="manage"
         />
         <div v-else class="empty-state">
           <h3>{{ items.length ? '暂无使用中的分类' : '从一个分类开始记账' }}</h3>
@@ -177,7 +176,6 @@ async function record(id: string | null = null, date?: string) {
     :today="today"
     :private-mode="privateMode"
     @close="detailId = null"
-    @edit="manage"
     @record="record"
   />
 </template>

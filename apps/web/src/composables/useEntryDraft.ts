@@ -1,5 +1,5 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue';
-import { calculateDay } from '@resilient-riches/core';
+import { calculateDay, parseMoney } from '@resilient-riches/core';
 import type {
   CalendarResponse,
   EntryDayItem,
@@ -125,7 +125,16 @@ export function useEntryDraft(
   function edit(value: EntryWrite) {
     if (!active.value) return;
     active.value.values = value;
-    active.value.dirty = true;
+    const original = from(active.value.reference).values;
+    try {
+      active.value.dirty =
+        value.note !== original.note ||
+        (['closingBalance', 'buy', 'sell'] as const).some(
+          (key) => parseMoney(value[key]) !== parseMoney(original[key]),
+        );
+    } catch {
+      active.value.dirty = true;
+    }
     touched.value = true;
     errors.value = {};
     error.value = '';
@@ -171,7 +180,6 @@ export function useEntryDraft(
       touched.value = true;
       message.value = `已保存 ${ids.length} 个分类的记录`;
       changed();
-      await loadCalendar();
     } catch (failure) {
       error.value = errorMessage(failure);
     } finally {
@@ -191,7 +199,6 @@ export function useEntryDraft(
       touched.value = true;
       message.value = '记录已删除';
       changed();
-      await loadCalendar();
     } catch (failure) {
       error.value = errorMessage(failure);
     } finally {
@@ -201,6 +208,9 @@ export function useEntryDraft(
   async function reload() {
     delete cache.value[date.value];
     await loadDay();
+  }
+  function discardDrafts() {
+    delete cache.value[date.value];
   }
   onMounted(() => {
     void loadDay();
@@ -230,6 +240,7 @@ export function useEntryDraft(
     save,
     remove,
     reload,
+    discardDrafts,
     changeDate,
     changeMonth,
     loadCalendar,

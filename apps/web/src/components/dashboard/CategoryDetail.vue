@@ -18,7 +18,7 @@ const props = defineProps<{
   today: string;
   privateMode: boolean;
 }>();
-defineEmits<{ close: []; edit: [id: string]; record: [id: string, date: string] }>();
+defineEmits<{ close: []; record: [id: string, date: string] }>();
 const data = ref<CategoryDetailResponse | null>(null),
   error = ref(''),
   loading = ref(true);
@@ -106,11 +106,7 @@ onUnmounted(() => controller?.abort());
       >
     </div>
     <footer class="overlay-footer">
-      <AppButton
-        :disabled="!data"
-        disabled-reason="分类信息尚未加载，请等待或重试"
-        @click="$emit('edit', id)"
-        >编辑分类</AppButton
+      <AppButton @click="$emit('close')">关闭</AppButton
       ><AppButton
         variant="primary"
         :disabled="!data || !!data.category.archivedOn"

@@ -2,7 +2,13 @@
 import { computed, ref } from 'vue';
 import { FinancialDecimal } from '@resilient-riches/core';
 import type { DashboardCategory } from '@resilient-riches/core';
-import { amountTone, lastEntryLabel, moneyLabel, signedMoney, rateLabel } from '../utils/format.ts';
+import {
+  amountTone,
+  recordingDateLabel,
+  moneyLabel,
+  signedMoney,
+  rateLabel,
+} from '../utils/format.ts';
 import AppIcon from './ui/AppIcon.vue';
 const props = withDefaults(
   defineProps<{
@@ -13,7 +19,7 @@ const props = withDefaults(
   }>(),
   { periodLabel: '本期', privateMode: false },
 );
-defineEmits<{ edit: [id: string]; record: [id: string] }>();
+defineEmits<{ view: [id: string]; edit: [id: string] }>();
 type SortKey = 'balance' | 'periodPnl' | 'returnRate' | 'totalPnl';
 const sort = ref<SortKey | null>(null),
   descending = ref(true);
@@ -89,14 +95,14 @@ function order(key: SortKey) {
               />
             </button>
           </th>
-          <th>上次录入</th>
-          <th><span class="sr-only">记录操作</span></th>
+          <th class="numeric">上次录入</th>
+          <th class="numeric">操作</th>
         </tr>
       </thead>
       <tbody>
         <tr v-for="item in sorted" :key="item.id">
           <td>
-            <button class="holding-name" @click="$emit('edit', item.id)">
+            <button class="holding-name" @click="$emit('view', item.id)">
               <span class="holding-icon" :style="{ color: item.color }"
                 ><AppIcon name="wallet" /></span
               ><span
@@ -128,24 +134,29 @@ function order(key: SortKey) {
           <td class="numeric" data-label="累计盈亏" :class="amountTone(item.totalPnl)">
             {{ privateMode ? '••••' : signedMoney(item.totalPnl) }}
           </td>
-          <td class="muted last-recorded" data-label="上次录入">
-            {{ lastEntryLabel(item.lastRecordedDate, today) }}
+          <td
+            class="muted last-recorded numeric"
+            data-label="上次录入"
+            :title="item.lastRecordedDate ?? '尚无录入'"
+          >
+            {{ recordingDateLabel(item.lastRecordedDate, today) }}
           </td>
           <td class="row-action">
-            <button
-              class="icon-button record-button"
-              :aria-label="`为${item.name}记录今天`"
-              :title="item.archivedOn ? undefined : '记录今天'"
-              :disabled="!!item.archivedOn"
-              :data-disabled-reason="
-                item.archivedOn
-                  ? '分类已归档，请恢复后记录今天；历史记录可在分类详情中修改'
-                  : undefined
-              "
-              @click="$emit('record', item.id)"
-            >
-              <AppIcon name="plus" />
-            </button>
+            <div class="table-actions">
+              <button
+                class="table-action"
+                :aria-label="`查看${item.name}`"
+                @click="$emit('view', item.id)"
+              >
+                查看</button
+              ><button
+                class="table-action"
+                :aria-label="`编辑${item.name}`"
+                @click="$emit('edit', item.id)"
+              >
+                编辑
+              </button>
+            </div>
           </td>
         </tr>
       </tbody>

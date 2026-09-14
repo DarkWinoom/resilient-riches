@@ -2,7 +2,7 @@
 import AppButton from '../ui/AppButton.vue';
 import AppIcon from '../ui/AppIcon.vue';
 defineProps<{ disabled: boolean; hasCategories: boolean }>();
-defineEmits<{ manage: []; record: []; report: [] }>();
+defineEmits<{ record: []; report: [] }>();
 </script>
 <template>
   <header class="topbar">
@@ -17,18 +17,12 @@ defineEmits<{ manage: []; record: []; report: [] }>();
           variant="quiet"
           :disabled="disabled"
           disabled-reason="账本暂未就绪，请稍候或重试"
-          @click="$emit('manage')"
-          ><AppIcon name="squares-four" />分类管理</AppButton
-        ><AppButton
-          variant="quiet"
-          :disabled="disabled"
-          disabled-reason="账本暂未就绪，请稍候或重试"
           @click="$emit('report')"
           ><AppIcon name="chart-bar" />收益报表</AppButton
         ><AppButton
           variant="primary"
           :disabled="disabled || !hasCategories"
-          :disabled-reason="disabled ? '账本暂未就绪，请稍候或重试' : '请先在分类管理中新增分类'"
+          :disabled-reason="disabled ? '账本暂未就绪，请稍候或重试' : '请先在分类持仓中新增分类'"
           @click="$emit('record')"
           ><AppIcon name="plus" />记录今日</AppButton
         >

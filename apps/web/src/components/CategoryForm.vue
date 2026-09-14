@@ -64,6 +64,7 @@ function update(values: CategoryValues, key: keyof CategoryValues, value: string
         id="category-history"
         label="历史盈亏"
         money
+        signed
         :model-value="modelValue.historicalPnl"
         :disabled="disabled"
         :error="errors.historicalPnl"

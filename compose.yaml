@@ -5,7 +5,7 @@ services:
     init: true
     restart: unless-stopped
     ports:
-      - '${RR_BIND_ADDRESS:-127.0.0.1}:${RR_PORT:-8080}:8080'
+      - '${RR_BIND_ADDRESS:-127.0.0.1}:${RR_PORT:-8888}:8080'
     environment:
       RR_HOST: 0.0.0.0
       RR_PORT: 8080
