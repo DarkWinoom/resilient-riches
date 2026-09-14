@@ -12,7 +12,7 @@
 
 [部署应用](#docker-部署推荐) · [开始记账](#开始记账) · [报表与分享](#报表与分享图片) · [备份与恢复](#备份账本) · [常见问题](#常见问题)
 
-![稳健生财首页：资产概览、收益曲线、资金分布与分类持仓](assets/screenshots/overview.png)
+![稳健生财首页：资产概览、收益曲线、资金分布与分类持仓](assets/screenshots/overview.jpg)
 
 本页截图使用独立演示账本中的模拟数据，包含收益波动、定投和资金转出。首次部署会得到空账本。
 
@@ -56,7 +56,7 @@ docker compose up -d       # 再次启动
 <details>
 <summary>查看每日记录界面</summary>
 
-![每日记录：日历选日期、分类标签切换、金额核对与收益预览](assets/screenshots/daily-entry.png)
+![每日记录：日历选日期、分类标签切换、金额核对与收益预览](assets/screenshots/daily-entry.jpg)
 
 </details>
 
@@ -98,7 +98,7 @@ docker compose up -d       # 再次启动
 <details>
 <summary>查看收益月报界面</summary>
 
-![收益月报：期间收益、复利收益率、简评、曲线与分类收益](assets/screenshots/monthly-report.png)
+![收益月报：期间收益、复利收益率、简评、曲线与分类收益](assets/screenshots/monthly-report.jpg)
 
 </details>
 
