@@ -96,7 +96,7 @@ function order(key: SortKey) {
             </button>
           </th>
           <th class="numeric">上次录入</th>
-          <th class="numeric">操作</th>
+          <th class="action-heading">操作</th>
         </tr>
       </thead>
       <tbody>

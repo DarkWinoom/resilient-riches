@@ -405,8 +405,7 @@
 }
 .dashboard-table th:last-child,
 .dashboard-table td:last-child {
-  padding-right: 22px;
-  padding-left: 0;
+  padding-inline: 10px;
 }
 .dashboard-table .holding-icon {
   width: 28px;
@@ -419,13 +418,14 @@
   white-space: nowrap;
   text-align: right;
 }
+.dashboard-table .action-heading,
 .dashboard-table .row-action {
-  text-align: right;
+  text-align: center;
 }
 .table-actions {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: center;
   gap: 4px;
 }
 .table-action {
@@ -540,10 +540,6 @@
   .dashboard-table th:first-child,
   .dashboard-table td:first-child {
     padding-left: 26px;
-  }
-  .dashboard-table th:last-child,
-  .dashboard-table td:last-child {
-    padding-right: 26px;
   }
 }
 @media (max-width: 1100px) {

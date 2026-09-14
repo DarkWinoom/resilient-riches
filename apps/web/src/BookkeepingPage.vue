@@ -125,9 +125,7 @@ async function record(id: string | null = null, date?: string) {
               @click="showArchived = !showArchived"
             >
               <span class="switch-track"></span>显示归档</button
-            ><AppButton variant="quiet" @click="manage()"
-              >新增分类<AppIcon name="plus"
-            /></AppButton>
+            ><AppButton variant="quiet" @click="manage()">新增分类</AppButton>
           </div>
         </header>
         <CategoryTable
