@@ -36,7 +36,9 @@ export function useEntryDraft(
     message = ref('');
   const errors = ref<Record<string, string>>({});
   let dayController: AbortController | undefined, calendarController: AbortController | undefined;
-  const drafts = computed(() => cache.value[date.value] ?? []);
+  const drafts = ref<EntryDraft[]>([]);
+  const loadedDate = ref(initialDate);
+  const ready = ref(false);
   const active = computed(() =>
     drafts.value.find((item) => item.values.categoryId === selectedId.value),
   );
@@ -51,6 +53,7 @@ export function useEntryDraft(
       reference: item,
       dirty: false,
       values: {
+        liquidationPnl: item.entry?.liquidationPnl ?? null,
         categoryId: item.category.id,
         categoryRevision: item.category.revision,
         revision: item.entry?.revision ?? null,
@@ -76,6 +79,9 @@ export function useEntryDraft(
       ),
     );
     cache.value[result.date] = next;
+    drafts.value = next;
+    loadedDate.value = result.date;
+    ready.value = true;
     if (!next.some((item) => item.values.categoryId === selectedId.value))
       selectedId.value = next[0]?.values.categoryId ?? null;
   }
@@ -84,6 +90,7 @@ export function useEntryDraft(
     const controller = new AbortController();
     dayController = controller;
     loading.value = true;
+    ready.value = false;
     error.value = '';
     try {
       const result = await api.day(date.value, controller.signal);
@@ -114,7 +121,12 @@ export function useEntryDraft(
     await loadCalendar();
   }
   async function changeDate(value: string) {
-    if (busy.value || value === date.value) return;
+    if (
+      busy.value ||
+      value === date.value ||
+      (active.value && value < active.value.reference.category.openingDate)
+    )
+      return;
     date.value = value;
     errors.value = {};
     message.value = '';
@@ -125,12 +137,13 @@ export function useEntryDraft(
     await loadDay();
   }
   function edit(value: EntryWrite) {
-    if (!active.value) return;
+    if (!active.value || !ready.value || busy.value) return;
     active.value.values = value;
     const original = from(active.value.reference).values;
     try {
       active.value.dirty =
         value.note !== original.note ||
+        value.liquidationPnl !== original.liquidationPnl ||
         (['closingBalance', 'buy', 'sell'] as const).some(
           (key) => parseMoney(value[key]) !== parseMoney(original[key]),
         );
@@ -152,14 +165,18 @@ export function useEntryDraft(
       }
   }
   async function save() {
-    if (busy.value || loading.value || !active.value) return;
+    if (busy.value || !ready.value || !active.value) return;
     const entries = drafts.value.filter((item) => item.dirty);
     if (!entries.length) entries.push(active.value);
     for (const draft of entries) {
       const found = entryErrors(draft.values);
       try {
         if (!Object.keys(found).length)
-          calculateDay({ ...draft.values, openingBalance: draft.reference.openingBalance });
+          calculateDay({
+            ...draft.values,
+            openingBalance: draft.reference.openingBalance,
+            priorPnl: draft.reference.priorPnl ?? '0',
+          });
       } catch (failure) {
         found.sell = failure instanceof Error ? failure.message : '金额无效';
       }
@@ -192,7 +209,7 @@ export function useEntryDraft(
   async function remove() {
     const draft = active.value,
       entry = draft?.reference.entry;
-    if (!draft || !entry || busy.value) return;
+    if (!draft || !entry || busy.value || !ready.value) return;
     busy.value = true;
     error.value = '';
     try {
@@ -227,6 +244,8 @@ export function useEntryDraft(
   });
   return {
     date,
+    loadedDate,
+    ready,
     month,
     selectedId,
     calendar,

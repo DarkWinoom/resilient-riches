@@ -16,6 +16,8 @@ import {
 describe('money boundaries', () => {
   it('preserves cents, signs and values above the JS safe integer range', () => {
     expect(parseMoney('0.10')).toBe(10n);
+    expect(parseMoney('200.')).toBe(20000n);
+    expect(parseMoney('-200.')).toBe(-20000n);
     expect(formatMoney(parseMoney('-1234.5'))).toBe('-1234.50');
     expect(formatMoney(parseMoney('-0.00'))).toBe('0.00');
     expect(parseMoney('999999999999.99')).toBe(MAX_INPUT_MINOR);

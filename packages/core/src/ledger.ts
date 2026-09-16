@@ -62,6 +62,7 @@ interface InternalDay {
 }
 
 interface ParsedEntry {
+  liquidation: bigint | null;
   closing: bigint;
   buy: bigint;
   sell: bigint;
@@ -69,6 +70,12 @@ interface ParsedEntry {
 
 function computeDay(opening: bigint, buy: bigint, sell: bigint, closing: bigint) {
   const capital = checkTotal(opening + buy - sell);
+  if (closing < 0n)
+    throw new LedgerError(
+      'NEGATIVE_LIQUIDATION',
+      '最终盈亏不能低于本轮投入本金的负值',
+      'liquidationPnl',
+    );
   if (capital < 0n) {
     throw new LedgerError('NEGATIVE_CAPITAL', '卖出不能超过前日余额与当日买入之和', 'sell');
   }
@@ -83,12 +90,20 @@ export function calculateDay(input: {
   buy: string;
   sell: string;
   closingBalance: string;
+  liquidationPnl?: string | null;
+  priorPnl?: string;
 }) {
   const result = computeDay(
     parseMoney(input.openingBalance, 'openingBalance', false),
     parseMoney(input.buy, 'buy', false),
     parseMoney(input.sell, 'sell', false),
-    parseMoney(input.closingBalance, 'closingBalance', false),
+    input.liquidationPnl == null
+      ? parseMoney(input.closingBalance, 'closingBalance', false)
+      : parseMoney(input.openingBalance) +
+          parseMoney(input.buy) -
+          parseMoney(input.sell) +
+          parseMoney(input.liquidationPnl) -
+          BigInt(new FinancialDecimal(input.priorPnl ?? '0').mul(100).toFixed(0)),
   );
   return {
     pnl: formatMoney(result.pnl),
@@ -111,14 +126,17 @@ function compound(
   let wiped = false;
   let restarted = false;
   let zeroGain = false;
+  let invalidHistory = false;
   const snapshot = () => {
-    const reason: RateReason | null = zeroGain
-      ? 'zero_capital_gain'
-      : restarted
-        ? 'capital_reset'
-        : valid
-          ? null
-          : 'no_capital';
+    const reason: RateReason | null = invalidHistory
+      ? 'invalid_historical_capital'
+      : zeroGain
+        ? 'zero_capital_gain'
+        : restarted
+          ? 'capital_reset'
+          : valid
+            ? null
+            : 'no_capital';
     return {
       returnRate: reason === null ? serializeRate(total.minus(1)) : null,
       rateReason: reason,
@@ -135,6 +153,7 @@ function compound(
     current = undefined;
   };
   for (const point of points) {
+    if (point.reason === 'invalid_historical_capital') invalidHistory = true;
     if (point.rate === null) {
       if (point.reason === 'zero_capital_gain') {
         flush();
@@ -191,27 +210,30 @@ function series(
   from: string,
   historical: bigint,
   includeCurve = false,
+  curvePoints: readonly InternalDay[] = points,
 ): LedgerSeries {
   const selected = points.filter((point) => point.date >= from);
   const closing = points.at(-1)?.closing ?? 0n;
   const cumulative = checkTotal(sumMoney(points.map((point) => point.pnl)) + historical);
   const curve: CurvePoint[] = [];
   let running = 0n;
-  const performance = compound(
-    selected,
-    includeCurve
-      ? (point, rate) => {
-          running = checkTotal(running + point.pnl);
-          curve.push({
-            date: point.date,
-            pnl: formatMoney(point.pnl),
-            cumulativePnl: formatMoney(running),
-            closingBalance: formatMoney(point.closing),
-            ...rate,
-          });
-        }
-      : undefined,
-  );
+  const performance = compound(selected);
+  if (includeCurve)
+    compound(
+      curvePoints.filter((point) => point.date >= from),
+      includeCurve
+        ? (point, rate) => {
+            running = checkTotal(running + point.pnl);
+            curve.push({
+              date: point.date,
+              pnl: formatMoney(point.pnl),
+              cumulativePnl: formatMoney(running),
+              closingBalance: formatMoney(point.closing),
+              ...rate,
+            });
+          }
+        : undefined,
+    );
   return {
     ...(includeCurve ? { curve } : {}),
     days: selected.map(serializeDay),
@@ -234,6 +256,7 @@ export function calculateLedger(input: {
   from?: string;
   timeline?: 'daily' | 'events' | 'period';
   includeCurve?: boolean;
+  includeOpeningHistory?: boolean;
 }): LedgerResult {
   parseDate(input.through, 'through');
   if (input.from !== undefined) parseDate(input.from, 'from');
@@ -247,6 +270,7 @@ export function calculateLedger(input: {
       opening: parseMoney(category.openingBalance),
       historical: parseMoney(category.historicalPnl),
       previous: 0n,
+      realized: 0n,
       activated: false,
       lastRecordedDate: null as string | null,
       records: new Map<string, ParsedEntry>(),
@@ -268,6 +292,7 @@ export function calculateLedger(input: {
     if (state.records.has(entry.date))
       throw new LedgerError('DUPLICATE_ENTRY', '同分类同日期只能有一条记录', 'date');
     state.records.set(entry.date, {
+      liquidation: entry.liquidationPnl == null ? null : parseMoney(entry.liquidationPnl),
       closing: parseMoney(entry.closingBalance),
       buy: parseMoney(entry.buy),
       sell: parseMoney(entry.sell),
@@ -280,6 +305,7 @@ export function calculateLedger(input: {
   const from =
     input.from ?? (earliest !== undefined && earliest <= input.through ? earliest : input.through);
   const portfolio: InternalDay[] = [];
+  const historicalCurve: InternalDay[] = [];
   let lastRecordedDate: string | null = null;
   const events = [
     ...new Set([
@@ -302,6 +328,8 @@ export function calculateLedger(input: {
     const opening = sumMoney(states.map((state) => state.previous));
     const buys: bigint[] = [];
     const sells: bigint[] = [];
+    let liquidated = 0n;
+    let openingHistory = 0n;
     let hasRecord = false;
     let hasOpening = false;
     for (const state of states) {
@@ -313,14 +341,27 @@ export function calculateLedger(input: {
       const record = state.records.get(date);
       const previous = isOpening ? state.opening : state.previous;
       const buy = record?.buy ?? 0n;
-      const sell = record?.sell ?? 0n;
-      const closing = record?.closing ?? previous;
+      const regularSell = record?.sell ?? 0n;
+      const settled =
+        record?.liquidation != null
+          ? previous + buy - regularSell + record.liquidation - state.historical - state.realized
+          : (record?.closing ?? previous);
+      if (settled < 0n)
+        throw new LedgerError(
+          'NEGATIVE_LIQUIDATION',
+          '最终盈亏不能低于本轮投入本金的负值',
+          'liquidationPnl',
+        );
+      const proceeds = record?.liquidation != null ? settled : 0n;
+      const sell = regularSell + proceeds;
+      const closing = record?.liquidation != null ? 0n : settled;
+      liquidated += proceeds;
       if (category.archivedOn != null && date >= category.archivedOn && closing !== 0n) {
         throw new LedgerError('NONZERO_ARCHIVE', '归档分类必须已经清空余额', 'archivedOn');
       }
       let values: ReturnType<typeof computeDay>;
       try {
-        values = computeDay(previous, buy, sell, closing);
+        values = computeDay(previous, buy, regularSell, settled);
       } catch (error) {
         if (error instanceof LedgerError)
           throw new LedgerError(
@@ -334,7 +375,10 @@ export function calculateLedger(input: {
         state.lastRecordedDate = date;
         hasRecord = true;
       }
-      if (isOpening) hasOpening = true;
+      if (isOpening) {
+        hasOpening = true;
+        openingHistory += state.historical;
+      }
       state.points.push({
         date,
         opening: previous,
@@ -345,6 +389,7 @@ export function calculateLedger(input: {
         source: record ? 'recorded' : isOpening ? 'opening' : isArchived ? 'archived' : 'carried',
         lastRecordedDate: state.lastRecordedDate,
       });
+      state.realized += values.pnl;
       state.previous = closing;
       buys.push(buy + (isOpening ? state.opening : 0n));
       sells.push(sell);
@@ -359,9 +404,24 @@ export function calculateLedger(input: {
       buy,
       sell,
       closing,
-      ...computeDay(opening, buy, sell, closing),
+      ...computeDay(opening, buy, sell - liquidated, closing + liquidated),
       source: hasRecord ? 'recorded' : hasOpening ? 'opening' : 'carried',
       lastRecordedDate,
+    });
+    const point = portfolio.at(-1)!;
+    const historicalCapital = opening + buy - (sell - liquidated) - openingHistory;
+    const historicalProfit = point.pnl + openingHistory;
+    historicalCurve.push({
+      ...point,
+      pnl: historicalProfit,
+      rate:
+        historicalCapital > 0n
+          ? new FinancialDecimal(historicalProfit.toString()).div(historicalCapital.toString())
+          : null,
+      reason:
+        historicalCapital <= 0n && openingHistory !== 0n
+          ? 'invalid_historical_capital'
+          : point.reason,
     });
   }
   return {
@@ -372,6 +432,7 @@ export function calculateLedger(input: {
       from,
       sumMoney(states.filter((state) => state.activated).map((state) => state.historical)),
       input.includeCurve,
+      input.includeOpeningHistory ? historicalCurve : portfolio,
     ),
     categories: states.map((state) => ({
       categoryId: state.category.id,

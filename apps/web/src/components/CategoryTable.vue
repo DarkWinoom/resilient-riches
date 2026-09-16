@@ -14,12 +14,51 @@ const props = withDefaults(
   defineProps<{
     items: readonly DashboardCategory[];
     today: string;
+    disabled?: boolean;
     periodLabel?: string;
     privateMode?: boolean;
   }>(),
   { periodLabel: '本期', privateMode: false },
 );
-defineEmits<{ view: [id: string]; edit: [id: string] }>();
+const emit = defineEmits<{ view: [id: string]; edit: [id: string]; reorder: [ids: string[]] }>();
+const dragging = ref<string | null>(null);
+const targetId = ref<string | null>(null);
+function drop(id: string) {
+  if (!dragging.value || props.disabled) return;
+  const ids = sorted.value.map((item) => item.id);
+  const source = ids.indexOf(dragging.value),
+    target = ids.indexOf(id);
+  dragging.value = null;
+  targetId.value = null;
+  if (source === target || source < 0 || target < 0) return;
+  ids.splice(target, 0, ids.splice(source, 1)[0]!);
+  sort.value = null;
+  emit('reorder', ids);
+}
+function pointerStart(event: PointerEvent, id: string) {
+  if (props.disabled || event.button !== 0) return;
+  event.preventDefault();
+  dragging.value = id;
+  (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+}
+function pointerMove(event: PointerEvent) {
+  if (!dragging.value) return;
+  const row = document
+    .elementFromPoint(event.clientX, event.clientY)
+    ?.closest<HTMLElement>('[data-category-id]');
+  targetId.value = row?.dataset.categoryId ?? null;
+}
+function pointerEnd() {
+  if (targetId.value) drop(targetId.value);
+  dragging.value = null;
+  targetId.value = null;
+}
+function move(id: string, delta: number) {
+  const target = sorted.value[sorted.value.findIndex((item) => item.id === id) + delta];
+  if (!target) return;
+  dragging.value = id;
+  drop(target.id);
+}
 type SortKey = 'balance' | 'periodPnl' | 'returnRate' | 'totalPnl';
 const sort = ref<SortKey | null>(null),
   descending = ref(true);
@@ -69,6 +108,7 @@ function order(key: SortKey) {
     </div>
     <table class="holdings-table dashboard-table">
       <colgroup>
+        <col class="col-drag" />
         <col class="col-name" />
         <col />
         <col />
@@ -79,6 +119,7 @@ function order(key: SortKey) {
       </colgroup>
       <thead>
         <tr>
+          <th class="drag-heading" aria-label="拖动排序"></th>
           <th>资产分类</th>
           <th
             v-for="column in columns"
@@ -100,14 +141,39 @@ function order(key: SortKey) {
         </tr>
       </thead>
       <tbody>
-        <tr v-for="item in sorted" :key="item.id">
+        <tr
+          v-for="item in sorted"
+          :key="item.id"
+          :data-category-id="item.id"
+          :class="{ 'holding-drop-target': targetId === item.id && dragging !== item.id }"
+        >
+          <td class="drag-cell">
+            <button
+              class="drag-handle"
+              :disabled="disabled"
+              :draggable="false"
+              :aria-label="`拖动排序：${item.name}`"
+              title="拖动排序，或使用上下方向键调整"
+              @pointerdown="pointerStart($event, item.id)"
+              @pointermove="pointerMove"
+              @pointerup="pointerEnd"
+              @pointercancel="
+                dragging = null;
+                targetId = null;
+              "
+              @keydown.up.prevent="move(item.id, -1)"
+              @keydown.down.prevent="move(item.id, 1)"
+            >
+              <AppIcon name="dots-six-vertical" />
+            </button>
+          </td>
           <td>
             <button class="holding-name" @click="$emit('view', item.id)">
               <span class="holding-icon" :style="{ color: item.color }"
                 ><AppIcon name="wallet" /></span
               ><span
                 ><strong>{{ item.name }}</strong
-                ><span v-if="item.archivedOn" class="muted holding-note">已归档</span
+                ><span v-if="item.archivedOn" class="muted holding-note">已清仓</span
                 ><span v-else-if="item.note && !privateMode" class="muted holding-note">{{
                   item.note
                 }}</span></span

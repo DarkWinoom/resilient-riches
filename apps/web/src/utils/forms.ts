@@ -24,6 +24,13 @@ export function categoryErrors(values: CategoryValues, today: string): Record<st
 
 export function entryErrors(values: EntryWrite): Record<string, string> {
   const errors: Record<string, string> = {};
+  if (values.liquidationPnl != null) {
+    try {
+      parseMoney(values.liquidationPnl, 'liquidationPnl');
+    } catch {
+      errors.liquidationPnl = '请输入有效的最终盈亏，最多两位小数';
+    }
+  }
   for (const key of ['closingBalance', 'buy', 'sell'] as const) {
     try {
       parseMoney(values[key], key, false);

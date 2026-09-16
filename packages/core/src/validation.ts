@@ -28,6 +28,7 @@ export function validateCategory(category: Category): void {
 }
 
 export function validateEntry(entry: DailyEntry): void {
+  if (entry.liquidationPnl != null) parseMoney(entry.liquidationPnl, 'liquidationPnl');
   text(entry.categoryId, 'categoryId', 64);
   parseDate(entry.date);
   parseMoney(entry.closingBalance, 'closingBalance', false);

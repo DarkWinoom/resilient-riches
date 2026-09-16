@@ -80,7 +80,7 @@ export function renderShareSvg(model: ShareModel): { svg: string; width: number;
       low = min < 0 ? min - spread * 0.12 : 0,
       high = max > 0 ? max + spread * 0.12 : low === 0 ? 1 : 0;
     const y = (value: number) => top + 40 + ((high - value) / (high - low)) * (chartHeight - 72);
-    const x = (index: number) => 156 + (index / Math.max(1, values.length)) * 650;
+    const x = (index: number) => 156 + (index / Math.max(1, values.length - 1)) * 650;
     parts.push(text(72, top, '累计收益率', 23, '#827a6e'));
     for (let index = 0; index < 4; index++) {
       const value = low + ((high - low) * index) / 3;
@@ -92,7 +92,7 @@ export function renderShareSvg(model: ShareModel): { svg: string; width: number;
     if (finite.length) {
       let path = '';
       let connected = false;
-      [0, ...values].forEach((value, index) => {
+      values.forEach((value, index) => {
         if (value === null || !Number.isFinite(value)) {
           connected = false;
           return;
@@ -105,7 +105,7 @@ export function renderShareSvg(model: ShareModel): { svg: string; width: number;
       );
     } else parts.push(text(475, top + 137, '暂无可计算的收益率', 26, '#827a6e', 'middle'));
     parts.push(
-      text(156, top + chartHeight + 3, '期初', 22, '#827a6e'),
+      text(156, top + chartHeight + 3, model.range.from.slice(5).replace('-', '.'), 22, '#827a6e'),
       text(
         806,
         top + chartHeight + 3,

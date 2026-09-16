@@ -5,6 +5,7 @@ import { api, errorMessage, RequestError } from '../api.ts';
 import { useConfirm } from '../composables/useConfirm.ts';
 import { useToast } from '../composables/useToast.ts';
 import { categoryErrors } from '../utils/forms.ts';
+import LiquidationDialog from './LiquidationDialog.vue';
 import CategoryForm from './CategoryForm.vue';
 import AppButton from './ui/AppButton.vue';
 import BaseOverlay from './ui/BaseOverlay.vue';
@@ -17,6 +18,8 @@ const props = defineProps<{
 const emit = defineEmits<{ close: []; changed: [] }>();
 const { pending, ask, finish } = useConfirm();
 const { success } = useToast();
+const liquidating = ref(false);
+const previous = ref<CategoryView | null>(null);
 const selected = ref(props.items.find((item) => item.id === props.initialId) ?? null);
 function defaults(): CategoryValues {
   return selected.value
@@ -115,7 +118,7 @@ async function save() {
         revision: selected.value.revision,
       });
     else await api.createCategory(values.value);
-    success(selected.value ? '分类已修改' : '分类已新增');
+    success(previous.value ? '分类已重新激活' : selected.value ? '分类已修改' : '分类已新增');
     completed();
   } catch (failure) {
     failed(failure);
@@ -123,36 +126,29 @@ async function save() {
     busy.value = false;
   }
 }
-async function archive() {
+function settlement() {
   const item = selected.value;
   if (!item || busy.value) return;
   if (dirty.value) {
-    error.value = '请先保存修改，再进行归档或恢复。';
+    error.value = '请先保存分类修改，再进行清仓或重新激活。';
     return;
   }
-  if (
-    !(await ask({
-      title: item.archivedOn ? '恢复分类？' : '归档分类？',
-      description: item.archivedOn
-        ? '恢复后可继续录入，历史记录保留。'
-        : '仅余额为零的分类可归档，历史记录保留。',
-      action: item.archivedOn ? '恢复分类' : '归档分类',
-    }))
-  )
+  if (!item.archivedOn) {
+    liquidating.value = true;
     return;
-  busy.value = true;
-  try {
-    await api.updateCategory(item.id, {
-      revision: item.revision,
-      archivedOn: item.archivedOn ? null : props.today,
-    });
-    success(item.archivedOn ? '分类已恢复' : '分类已归档');
-    completed();
-  } catch (failure) {
-    failed(failure);
-  } finally {
-    busy.value = false;
   }
+  previous.value = item;
+  selected.value = null;
+  initial.value = {
+    name: item.name,
+    color: item.color,
+    note: item.note,
+    openingDate: props.today,
+    openingBalance: '0.00',
+    historicalPnl: item.totalPnl,
+    previousCycleId: item.id,
+  };
+  values.value = { ...initial.value };
 }
 async function remove() {
   const item = selected.value;
@@ -182,11 +178,14 @@ async function remove() {
 </script>
 <template>
   <BaseOverlay
-    :title="selected ? '编辑分类' : '新增分类'"
+    :title="previous ? '重新激活分类' : selected ? '编辑分类' : '新增分类'"
     kind="drawer"
     :busy="busy"
     @request-close="close"
     ><div class="drawer-body">
+      <p v-if="previous" class="detail-note">
+        已将上次清仓金额填入历史盈亏，可按实际情况修改。保存后，以本次填写的初始资金、历史盈亏和启用日期重新计算。
+      </p>
       <form id="category-form" ref="form" @submit.prevent="save">
         <CategoryForm
           :today="today"
@@ -204,10 +203,10 @@ async function remove() {
       </div>
       <div v-if="selected" class="category-maintenance">
         <AppButton
-          :disabled="busy || (!selected.archivedOn && selected.balance !== '0.00')"
-          :disabled-reason="busy ? '正在保存，请稍候' : '分类余额需归零后才可归档'"
-          @click="archive"
-          >{{ selected.archivedOn ? '恢复分类' : '归档分类' }}</AppButton
+          :disabled="busy || items.some((item) => item.previousCycleId === selected?.id)"
+          :disabled-reason="busy ? '正在保存，请稍候' : '此轮持仓已重新激活'"
+          @click="settlement"
+          >{{ selected.archivedOn ? '重新激活' : '一键清仓' }}</AppButton
         ><AppButton variant="quiet" class="danger-text" :disabled="busy" @click="remove"
           >删除分类</AppButton
         >
@@ -216,8 +215,13 @@ async function remove() {
     <footer class="overlay-footer">
       <AppButton :disabled="busy" @click="close">取消</AppButton
       ><AppButton variant="primary" :loading="busy" @click="save">{{
-        selected ? '保存修改' : '新增分类'
+        previous ? '开始新持仓' : selected ? '保存修改' : '新增分类'
       }}</AppButton>
     </footer></BaseOverlay
-  ><ConfirmDialog v-if="pending" :request="pending" @answer="finish" />
+  ><LiquidationDialog
+    v-if="liquidating && selected"
+    :category="selected"
+    @close="liquidating = false"
+    @saved="completed"
+  /><ConfirmDialog v-if="pending" :request="pending" @answer="finish" />
 </template>

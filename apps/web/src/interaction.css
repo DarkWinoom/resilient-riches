@@ -253,3 +253,42 @@
     --dp-menu-padding: 0px;
   }
 }
+
+.loading-region {
+  position: relative;
+}
+.loading-indicator {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  background: #ffffff70;
+  pointer-events: none;
+  opacity: 0;
+  animation: reveal-loading 160ms ease 180ms forwards;
+}
+.loading-indicator > .ph-light {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #fffaf0;
+  box-shadow: 0 3px 16px #332b2414;
+  color: var(--gold);
+  font-size: 24px;
+}
+@keyframes reveal-loading {
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .loading-indicator {
+    animation-duration: 0ms;
+  }
+  .loading-indicator .spin {
+    animation: none;
+  }
+}

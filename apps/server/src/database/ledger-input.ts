@@ -17,6 +17,7 @@ function integer(row: Row, key: string): bigint {
 export function categoryFromRow(row: Row): CategoryRecord {
   return {
     id: text(row, 'id'),
+    previousCycleId: row.previous_cycle_id == null ? null : text(row, 'previous_cycle_id'),
     name: text(row, 'name'),
     color: text(row, 'color'),
     openingDate: text(row, 'opening_date'),
@@ -32,6 +33,8 @@ export function categoryFromRow(row: Row): CategoryRecord {
 }
 export function entryFromRow(row: Row): EntryRecord {
   return {
+    liquidationPnl:
+      row.liquidation_pnl_minor == null ? null : formatMoney(integer(row, 'liquidation_pnl_minor')),
     id: text(row, 'id'),
     categoryId: text(row, 'category_id'),
     date: text(row, 'date'),
@@ -44,17 +47,28 @@ export function entryFromRow(row: Row): EntryRecord {
     updatedAt: text(row, 'updated_at'),
   };
 }
-export function loadLedgerInput(database: AppDatabase): {
+export function loadLedgerInput(
+  database: AppDatabase,
+  includePreviousCycles = false,
+): {
   categories: CategoryRecord[];
   entries: EntryRecord[];
 } {
   return {
     categories: database
-      .prepare('SELECT * FROM categories ORDER BY sort_order, name')
+      .prepare(
+        includePreviousCycles
+          ? 'SELECT * FROM categories ORDER BY sort_order, name'
+          : 'SELECT * FROM categories c WHERE NOT EXISTS (SELECT 1 FROM categories n WHERE n.previous_cycle_id=c.id) ORDER BY sort_order, name',
+      )
       .all()
       .map(categoryFromRow),
     entries: database
-      .prepare('SELECT * FROM daily_entries ORDER BY date, category_id')
+      .prepare(
+        includePreviousCycles
+          ? 'SELECT * FROM daily_entries ORDER BY date, category_id'
+          : 'SELECT * FROM daily_entries e WHERE NOT EXISTS (SELECT 1 FROM categories n WHERE n.previous_cycle_id=e.category_id) ORDER BY date, category_id',
+      )
       .all()
       .map(entryFromRow),
   };

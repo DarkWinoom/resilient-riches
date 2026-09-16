@@ -100,10 +100,12 @@ describe('bookkeeping UI with real ledger API', () => {
     await button('收益报表').trigger('click');
     await settle();
     expect(wrapper.get('.report-title').text()).toContain('收益日报');
+    expect(wrapper.getComponent(ReportDrawer).find('.return-panel').exists()).toBe(false);
     const report = wrapper.getComponent(ReportDrawer);
     await report.findAll('.period-segment button')[3]!.trigger('click');
     await settle();
     expect(report.get('.report-title').text()).toContain('收益年报');
+    expect(report.find('.return-panel').exists()).toBe(true);
     await report.get('[aria-label="关闭收益报表"]').trigger('click');
     expect(wrapper.findAll('dialog')).toHaveLength(0);
   });
@@ -228,7 +230,7 @@ describe('bookkeeping UI with real ledger API', () => {
     expect(wrapper.get('.holdings-table').text()).not.toContain('1,100.00');
     expect(wrapper.get('.return-plot').attributes('aria-label')).toContain('收益率');
     await wrapper.get('.return-plot').trigger('keydown', { key: 'End' });
-    expect(wrapper.get('.chart-tooltip').text()).toContain('10.00%');
+    expect(wrapper.get('.chart-tooltip').text()).toContain('15.79%');
     expect(wrapper.get('.chart-tooltip').text()).not.toContain('当日余额');
   });
   it('opens a real historical entry from details and refreshes the dashboard after editing', async () => {
@@ -322,35 +324,45 @@ describe('bookkeeping UI with real ledger API', () => {
     await settle();
     expect(wrapper.get('.calendar-day.active').attributes('aria-label')).toContain('2026-09-14');
   });
-  it('archives and restores a cleared category and closes after each confirmed mutation', async () => {
-    const category = await api.createCategory({
-      name: '已清空',
-      color: '#b69a60',
-      openingDate: '2026-09-01',
-      openingBalance: '0',
-      historicalPnl: '0',
-      note: '',
-    });
+  it('settles a holding and reactivates with new capital while retaining settled profit', async () => {
+    const category = await create();
     wrapper = mount(CategoryDrawer, {
       props: { items: [category], today, initialId: category.id },
       global,
     });
-    await button('归档分类').trigger('click');
+    await button('一键清仓').trigger('click');
+    await wrapper.get('#liquidation-pnl').setValue('300.');
+    await button('清仓').trigger('click');
     await settle();
-    await wrapper.get('.confirmation-actions .button--primary').trigger('click');
+    expect((await api.categories()).items[0]?.balance).toBe('1000.00');
+    await button('确认清仓').trigger('click');
     await settle();
-    expect((await api.categories()).items[0]?.archivedOn).toBe(today);
+    expect((await api.categories()).items[0]).toMatchObject({
+      balance: '0.00',
+      totalPnl: '300.00',
+      archivedOn: today,
+    });
     expect(wrapper.emitted('close')).toHaveLength(1);
     wrapper.unmount();
     wrapper = mount(CategoryDrawer, {
       props: { items: (await api.categories()).items, today, initialId: category.id },
       global,
     });
-    await button('恢复分类').trigger('click');
+    await button('重新激活').trigger('click');
+    expect((wrapper.get('#category-history').element as HTMLInputElement).value).toBe('300.00');
+    await wrapper.get('#category-balance').setValue('2000.');
+    await button('开始新持仓').trigger('click');
     await settle();
-    await wrapper.get('.confirmation-actions .button--primary').trigger('click');
-    await settle();
-    expect((await api.categories()).items[0]?.archivedOn).toBeNull();
+    const data = await api.dashboard('month', today);
+    expect(data.overview.current).toMatchObject({
+      closingBalance: '2000.00',
+      cumulativePnl: '300.00',
+    });
+    expect(data.categories.find((item) => item.previousCycleId === category.id)).toMatchObject({
+      openingBalance: '2000.00',
+      totalPnl: '300.00',
+      archivedOn: null,
+    });
     expect(wrapper.emitted('close')).toHaveLength(1);
   });
 
@@ -601,5 +613,158 @@ describe('bookkeeping UI with real ledger API', () => {
     expect(lastEntryLabel('2026-09-12', today)).toBe('上次录入：昨天');
     expect(lastEntryLabel('2025-08-13', today)).toBe('上次录入：2025-08-13');
     expect(lastEntryLabel(null, today)).toBe('尚无录入');
+  });
+  it('keeps detail periods independent and lists every day for a week', async () => {
+    await create();
+    wrapper = mount(BookkeepingPage, { global });
+    await settle();
+    await button('日').trigger('click');
+    await settle();
+    await wrapper.get('[aria-label="查看稳健理财"]').trigger('click');
+    await settle();
+    const detail = wrapper.getComponent(CategoryDetail);
+    expect(detail.findAll('.period-segment button').map((item) => item.text())).toEqual([
+      '年',
+      '月',
+      '周',
+      '日',
+    ]);
+    expect(detail.get('[aria-pressed="true"]').text()).toBe('年');
+    expect(detail.find('.detail-chart').exists()).toBe(true);
+    await detail.findAll('.period-segment button')[2]!.trigger('click');
+    await settle();
+    expect(detail.find('.detail-chart').exists()).toBe(false);
+    expect(detail.findAll('.detail-daily tbody tr')).toHaveLength(7);
+    expect(wrapper.get('.performance-heading .period-segment [aria-pressed="true"]').text()).toBe(
+      '日',
+    );
+    await detail.findAll('.period-segment button')[3]!.trigger('click');
+    await settle();
+    expect(detail.findAll('.detail-daily tbody tr')).toHaveLength(1);
+  });
+  it('saves handle order with closed holdings hidden and shows them by default', async () => {
+    const a = await create('A');
+    const b = await create('B');
+    const c = await create('C');
+    await api.liquidate(b.id, b.revision, '50');
+    wrapper = mount(BookkeepingPage, { global });
+    await settle();
+    expect(wrapper.findAll('.holdings-table tbody tr')).toHaveLength(3);
+    await wrapper.get('.switch-control').trigger('click');
+    expect(wrapper.findAll('.holdings-table tbody tr')).toHaveLength(2);
+    await wrapper.get('[aria-label="拖动排序：C"]').trigger('keydown', { key: 'ArrowUp' });
+    await settle();
+    expect((await api.categories()).items.map((item) => item.id)).toEqual([c.id, b.id, a.id]);
+    expect(wrapper.findAll('.holding-name strong').map((item) => item.text())).toEqual(['C', 'A']);
+    await wrapper.get('.switch-control').trigger('click');
+    expect(wrapper.findAll('.holding-name strong').map((item) => item.text())).toEqual([
+      'C',
+      'B',
+      'A',
+    ]);
+  });
+  it('disables dates before the selected category opens and updates the bound when changing categories', async () => {
+    const early = await create('较早分类');
+    const late = await create('较晚分类');
+    await api.updateCategory(late.id, { revision: late.revision, openingDate: '2026-09-10' });
+    wrapper = mount(EntryDialog, { props: { today, initialId: late.id }, global });
+    await settle();
+    const before = wrapper.get('[aria-label^="2026-09-09，"]');
+    expect(before.attributes('disabled')).toBeDefined();
+    expect(before.attributes('data-disabled-reason')).toContain('2026-09-10');
+    expect(wrapper.get('[aria-label="上个月"]').attributes('disabled')).toBeDefined();
+    expect(
+      wrapper.get('[aria-label^="2026-09-14，"]').attributes('data-disabled-reason'),
+    ).toBeUndefined();
+    await before.trigger('click');
+    await settle();
+    expect(wrapper.get('.calendar-day.active').attributes('aria-label')).toContain(today);
+    await wrapper.get('[id="entry-panel-tab-' + early.id + '"]').trigger('click');
+    expect(wrapper.get('[aria-label^="2026-09-09，"]').attributes('disabled')).toBeUndefined();
+  });
+  it('previews cumulative profit from prior results and current cash flows without double counting the edited day', async () => {
+    const category = await create();
+    await api.saveEntries('2026-09-12', [
+      {
+        categoryId: category.id,
+        categoryRevision: category.revision,
+        revision: null,
+        closingBalance: '1100',
+        buy: '0',
+        sell: '0',
+        note: '',
+      },
+    ]);
+    wrapper = mount(EntryDialog, {
+      props: { today, initialId: category.id, initialDate: '2026-09-12' },
+      global,
+    });
+    await settle();
+    expect(wrapper.get('.entry-reference').text()).toContain('+150.00');
+    expect(wrapper.get('.entry-reference').text()).toContain('启用日期：2026-09-01');
+    expect(wrapper.get('.entry-reference').text()).not.toContain('核对前金额');
+    await wrapper.get('#entry-buy').setValue('100');
+    expect(wrapper.get('.entry-reference').text()).toContain('+50.00');
+    await wrapper.get('#entry-balance').setValue('1210.');
+    expect(wrapper.get('.entry-reference').text()).toContain('+160.00');
+    await wrapper.get('#entry-sell').setValue('100');
+    expect(wrapper.get('.entry-reference').text()).toContain('+260.00');
+  });
+  it('keeps the form and tabs in place during date loading and prevents saving stale data after failure', async () => {
+    const category = await create();
+    wrapper = mount(EntryDialog, {
+      props: { today, initialId: category.id },
+      attachTo: document.body,
+    });
+    await settle();
+    const body = new DOMWrapper(document.body);
+    const action = (text: string) => body.findAll('button').find((item) => item.text() === text)!;
+    const originalForm = body.get('.entry-panel form').element;
+    let rejectLoad!: (error: Error) => void;
+    vi.spyOn(api, 'day').mockImplementationOnce(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejectLoad = reject;
+        }),
+    );
+    await body.get('[aria-label^="2026-09-12，"]').trigger('click');
+    expect(body.get('.entry-panel form').element).toBe(originalForm);
+    expect(body.findAll('[role="tab"]')).toHaveLength(1);
+    expect(body.get('#entry-balance').attributes('disabled')).toBeDefined();
+    expect(body.get('[aria-label="正在读取记录"]').text()).toBe('');
+    expect(body.text()).not.toContain('读取记录中');
+    rejectLoad(new Error('offline'));
+    await settle();
+    expect(action('保存当日记录').attributes('disabled')).toBeDefined();
+    expect(action('重新载入').attributes('disabled')).toBeUndefined();
+    await action('重新载入').trigger('click');
+    await settle();
+    expect(action('保存当日记录').attributes('disabled')).toBeUndefined();
+    expect(body.get('.section-heading h3').text()).toBe('2026-09-12');
+  });
+  it('keeps the existing detail chart while fetching a daily view without inserting loading text', async () => {
+    const category = await create();
+    wrapper = mount(CategoryDetail, {
+      props: { id: category.id, today, privateMode: false },
+      global,
+    });
+    await settle();
+    const result = await api.detail(category.id, 'day', today);
+    let resolveLoad!: (value: typeof result) => void;
+    vi.spyOn(api, 'detail').mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveLoad = resolve;
+        }),
+    );
+    await wrapper.findAll('.period-segment button')[3]!.trigger('click');
+    expect(wrapper.find('.detail-chart').exists()).toBe(true);
+    expect(wrapper.find('.detail-daily').exists()).toBe(false);
+    expect(wrapper.get('[aria-label="正在读取分类"]').text()).toBe('');
+    expect(wrapper.text()).not.toContain('正在读取分类');
+    resolveLoad(result);
+    await settle();
+    expect(wrapper.find('.detail-chart').exists()).toBe(false);
+    expect(wrapper.findAll('.detail-daily tbody tr')).toHaveLength(1);
   });
 });

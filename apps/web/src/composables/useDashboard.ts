@@ -1,8 +1,11 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import type { DashboardResponse, Period } from '@resilient-riches/core';
+import { useToast } from './useToast.ts';
 import { api, errorMessage } from '../api.ts';
 
 export function useDashboard() {
+  const { success } = useToast();
+  const sorting = ref(false);
   const data = ref<DashboardResponse | null>(null);
   const period = ref<Period>('month'),
     anchor = ref(''),
@@ -40,10 +43,42 @@ export function useDashboard() {
     anchor.value = nextAnchor;
     await load(false);
   }
+  async function reorder(ids: string[]) {
+    if (!data.value || sorting.value || loading.value) return;
+    const all = data.value.categories;
+    const visible = new Set(ids);
+    let index = 0;
+    const ordered = all.map((item) => {
+      if (!visible.has(item.id)) return item;
+      const id = ids[index++];
+      return all.find((row) => row.id === id)!;
+    });
+    sorting.value = true;
+    try {
+      const result = await api.reorder(ordered.map(({ id, revision }) => ({ id, revision })));
+      const byId = new Map(all.map((item) => [item.id, item]));
+      data.value = {
+        ...data.value,
+        categories: result.items.map((item) => ({
+          ...byId.get(item.id)!,
+          revision: item.revision,
+          sortOrder: item.sortOrder,
+        })),
+      };
+      success('分类顺序已保存');
+    } catch (error) {
+      success(errorMessage(error));
+      await load(false);
+    } finally {
+      sorting.value = false;
+    }
+  }
   onMounted(() => load());
   onUnmounted(() => controller?.abort());
   return {
     data,
+    sorting,
+    reorder,
     period,
     anchor,
     today,

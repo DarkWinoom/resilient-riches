@@ -100,7 +100,7 @@ function select(value: ModelValue) {
 }
 </script>
 <template>
-  <div class="period-calendar" data-disabled-default="超出可选日期范围，不能选择未来期间">
+  <div class="period-calendar">
     <div v-if="choosingYear" class="year-page-controls">
       <button
         type="button"
@@ -118,7 +118,6 @@ function select(value: ModelValue) {
         class="icon-button"
         aria-label="后12年"
         :disabled="yearPage + 12 > Number(today.slice(0, 4))"
-        data-disabled-reason="不能选择未来年份"
         @click="navigateYear(1)"
       >
         <AppIcon name="caret-right" />

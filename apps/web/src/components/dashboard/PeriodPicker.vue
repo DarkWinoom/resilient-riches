@@ -7,6 +7,7 @@ import AppIcon from '../ui/AppIcon.vue';
 import BaseOverlay from '../ui/BaseOverlay.vue';
 import PeriodCalendar from './PeriodCalendar.vue';
 const props = defineProps<{
+  reverse?: boolean;
   period: Period;
   anchor: string;
   today: string;
@@ -15,13 +16,14 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ change: [period: Period, anchor: string] }>();
 const choosing = ref(false);
-const labels: { id: Period; label: string }[] = [
+const options: { id: Period; label: string }[] = [
   { id: 'day', label: '日' },
   { id: 'week', label: '周' },
   { id: 'month', label: '月' },
   { id: 'year', label: '年' },
 ];
-const index = computed(() => labels.findIndex((item) => item.id === props.period));
+const labels = computed(() => (props.reverse ? [...options].reverse() : options));
+const index = computed(() => labels.value.findIndex((item) => item.id === props.period));
 function adjacent(delta: number) {
   const range = periodRange(props.period, props.anchor, props.today);
   if (delta < 0) {
@@ -71,7 +73,7 @@ function select(date: string) {
         class="icon-button"
         aria-label="下一期间"
         :disabled="disabled || !adjacent(1)"
-        :data-disabled-reason="disabled ? '正在读取收益数据，请稍候' : '不能查看未来期间'"
+        :data-disabled-reason="disabled ? '正在读取收益数据，请稍候' : undefined"
         @click="move(1)"
       >
         <AppIcon name="caret-right" />

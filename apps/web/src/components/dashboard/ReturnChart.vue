@@ -41,7 +41,7 @@ const values = computed(() =>
       : Number(point.cumulativePnl),
   ),
 );
-const samples = computed(() => [0, ...values.value]);
+const samples = values;
 const available = computed(() => values.value.some((value) => value !== null));
 const flat = computed(() => values.value.every((value) => value === null || value === 0));
 const lastValue = computed(() => values.value.at(-1) ?? null);
@@ -101,10 +101,9 @@ function pointAt(event: PointerEvent) {
   }
   const rect = plot.value?.getBoundingClientRect();
   if (!rect) return;
-  const index =
-    Math.round(
-      ((event.clientX - rect.left - 66) / (width.value - 88)) * (samples.value.length - 1),
-    ) - 1;
+  const index = Math.round(
+    ((event.clientX - rect.left - 66) / (width.value - 88)) * (samples.value.length - 1),
+  );
   active.value = Math.max(0, Math.min(props.points.length - 1, index));
 }
 function key(event: KeyboardEvent) {
@@ -204,28 +203,22 @@ const dateLabels = computed(() => {
           r="3"
           class="chart-dot"
         />
-        <text x="66" :y="height - 8">期初</text>
         <text
           v-for="label in dateLabels"
           :key="label.index"
-          :x="x(label.index + 1)"
+          :x="x(label.index)"
           :y="height - 8"
-          :text-anchor="label.index === points.length - 1 ? 'end' : 'middle'"
-          :class="{ 'chart-first-date': label.index === 0 && points.length > 4 }"
+          :text-anchor="
+            label.index === 0 ? 'start' : label.index === points.length - 1 ? 'end' : 'middle'
+          "
         >
           {{ label.label }}
         </text>
         <template v-if="tooltip && active !== null">
-          <line
-            :x1="x(active + 1)"
-            :x2="x(active + 1)"
-            y1="16"
-            :y2="height - 34"
-            class="chart-crosshair"
-          />
+          <line :x1="x(active)" :x2="x(active)" y1="16" :y2="height - 34" class="chart-crosshair" />
           <circle
             v-if="values[active] !== null"
-            :cx="x(active + 1)"
+            :cx="x(active)"
             :cy="y(values[active] ?? 0)"
             r="4"
             class="chart-dot"
@@ -239,7 +232,7 @@ const dateLabels = computed(() => {
         v-if="tooltip"
         class="chart-tooltip"
         role="status"
-        :style="{ left: `${Math.max(0, Math.min(width - 220, x((active ?? 0) + 1) - 100))}px` }"
+        :style="{ left: `${Math.max(0, Math.min(width - 220, x(active ?? 0) - 100))}px` }"
       >
         <strong>{{ tooltip.date }}</strong
         ><span
@@ -261,7 +254,9 @@ const dateLabels = computed(() => {
         ><span v-if="tooltip.rateReason && tooltip.rateReason !== 'no_capital'" class="muted">{{
           tooltip.rateReason === 'capital_reset'
             ? '本金归零后重启，无法连续复利'
-            : '存在零本金收益，无法连续复利'
+            : tooltip.rateReason === 'invalid_historical_capital'
+              ? '历史本金无效，无法计算收益率'
+              : '存在零本金收益，无法连续复利'
         }}</span>
       </div>
     </div>

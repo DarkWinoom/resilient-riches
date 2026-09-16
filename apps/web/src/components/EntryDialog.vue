@@ -2,6 +2,7 @@
 import { computed, useTemplateRef } from 'vue';
 import { useEntryDraft } from '../composables/useEntryDraft.ts';
 import { useConfirm } from '../composables/useConfirm.ts';
+import LoadingIndicator from './ui/LoadingIndicator.vue';
 import EntryCalendar from './EntryCalendar.vue';
 import CategoryEntryForm from './CategoryEntryForm.vue';
 import AppButton from './ui/AppButton.vue';
@@ -13,6 +14,8 @@ const emit = defineEmits<{ close: []; changed: [] }>();
 const { pending, ask, finish } = useConfirm();
 const {
   date,
+  loadedDate,
+  ready,
   month,
   selectedId,
   calendar,
@@ -48,7 +51,12 @@ async function submit() {
   await save();
 }
 async function selectDate(value: string) {
-  if (value === date.value || busy.value) return;
+  if (
+    value === date.value ||
+    busy.value ||
+    (active.value && value < active.value.reference.category.openingDate)
+  )
+    return;
   if (
     dirtyCount.value &&
     !(await ask({
@@ -116,15 +124,17 @@ async function deleteRecord() {
         :month="month"
         :date="date"
         :today="today"
+        :min-date="active?.reference.category.openingDate"
         :calendar="calendar"
         :loading="calendarLoading"
-        :disabled="busy"
+        :disabled="busy || loading"
         :error="calendarError"
         @date="selectDate"
         @month="changeMonth"
         @retry="loadCalendar"
       />
-      <section class="entry-content">
+      <section class="entry-content loading-region" :aria-busy="loading">
+        <LoadingIndicator v-if="loading" label="正在读取记录" />
         <div class="section-heading">
           <h3>{{ date }}</h3>
           <span v-if="dirtyCount" class="muted">{{ dirtyCount }} 个草稿待保存</span>
@@ -134,7 +144,7 @@ async function deleteRecord() {
           :items="tabs"
           label="选择分类"
           panel-id="entry-panel"
-          :disabled="busy || loading"
+          :disabled="busy || !ready"
         />
         <div
           id="entry-panel"
@@ -142,16 +152,20 @@ async function deleteRecord() {
           :aria-labelledby="selectedId ? `entry-panel-tab-${selectedId}` : undefined"
           class="entry-panel"
         >
-          <p v-if="loading" class="loading-state" role="status">读取记录中…</p>
           <form
-            v-else-if="active"
-            :key="`${date}-${selectedId}`"
+            v-if="active"
+            :key="`${loadedDate}-${selectedId}`"
             ref="form"
             @submit.prevent="submit"
           >
-            <CategoryEntryForm :draft="active" :errors="errors" :disabled="busy" @update="edit" />
+            <CategoryEntryForm
+              :draft="active"
+              :errors="errors"
+              :disabled="busy || !ready"
+              @update="edit"
+            />
           </form>
-          <div v-else-if="!error" class="empty-state">
+          <div v-else-if="!loading && !error" class="empty-state">
             <h3>这一天暂无可录入分类</h3>
             <p>请选择分类启用后的日期，或先新增分类。</p>
           </div>
@@ -169,20 +183,22 @@ async function deleteRecord() {
         v-if="active?.reference.entry"
         variant="quiet"
         class="danger-text footer-leading"
-        :disabled="busy || loading"
+        :disabled="busy || !ready"
         @click="deleteRecord"
         >删除本条记录</AppButton
       ><AppButton :disabled="busy" @click="close">关闭</AppButton
       ><AppButton
         variant="primary"
-        :disabled="loading || !active"
+        :disabled="!ready || !active"
         :loading="busy"
         :disabled-reason="
           busy
             ? '正在保存，请稍候'
             : loading
               ? '正在读取记录，请稍候'
-              : '该日期暂无可录入分类，请选择其它日期或新增分类'
+              : !ready
+                ? '所选日期尚未加载，请重新载入'
+                : '该日期暂无可录入分类，请选择其它日期或新增分类'
         "
         @click="submit"
         >保存当日记录</AppButton

@@ -14,7 +14,8 @@ import ReturnChart from './components/dashboard/ReturnChart.vue';
 import AllocationBars from './components/dashboard/AllocationBars.vue';
 import CategoryDetail from './components/dashboard/CategoryDetail.vue';
 import ReportDrawer from './components/reports/ReportDrawer.vue';
-const { data, period, anchor, today, loading, error, items, load, choose } = useDashboard();
+const { data, period, anchor, today, loading, error, items, load, choose, sorting, reorder } =
+  useDashboard();
 const drawer = ref(false),
   openingRecord = ref(false),
   reportOpen = ref(false),
@@ -22,11 +23,9 @@ const drawer = ref(false),
   initialId = ref<string | null>(null),
   detailId = ref<string | null>(null),
   entryDate = ref(''),
-  showArchived = ref(false),
+  hideClosed = ref(false),
   privateMode = ref(false);
-const visible = computed(() =>
-  items.value.filter((item) => showArchived.value || !item.archivedOn),
-);
+const visible = computed(() => items.value.filter((item) => !hideClosed.value || !item.archivedOn));
 const label = computed(() => {
   const current = data.value?.range.to === today.value;
   return (
@@ -57,8 +56,8 @@ async function record(id: string | null = null, date?: string) {
 </script>
 <template>
   <AppHeader
-    :disabled="!data || openingRecord"
-    :has-categories="!!items.length"
+    :disabled="!data || openingRecord || sorting"
+    :has-categories="items.some((item) => !item.archivedOn)"
     @record="record()"
     @report="reportOpen = true"
   />
@@ -96,7 +95,7 @@ async function record(id: string | null = null, date?: string) {
             :anchor="anchor"
             :today="today"
             :range="data.range"
-            :disabled="loading"
+            :disabled="loading || sorting"
             @change="choose"
           />
         </div>
@@ -125,10 +124,10 @@ async function record(id: string | null = null, date?: string) {
             <button
               class="switch-control"
               role="switch"
-              :aria-checked="showArchived"
-              @click="showArchived = !showArchived"
+              :aria-checked="hideClosed"
+              @click="hideClosed = !hideClosed"
             >
-              <span class="switch-track"></span>显示归档</button
+              <span class="switch-track"></span>隐藏已清仓</button
             ><AppButton variant="quiet" @click="manage()">新增分类</AppButton>
           </div>
         </header>
@@ -138,7 +137,9 @@ async function record(id: string | null = null, date?: string) {
           :today="today"
           :period-label="label"
           :private-mode="privateMode"
+          :disabled="sorting || loading"
           @view="detailId = $event"
+          @reorder="reorder"
           @edit="manage"
         />
         <div v-else class="empty-state">
@@ -173,8 +174,6 @@ async function record(id: string | null = null, date?: string) {
   /><CategoryDetail
     v-if="detailId && data"
     :id="detailId"
-    :period="data.period"
-    :anchor="data.anchor"
     :today="today"
     :private-mode="privateMode"
     @close="detailId = null"

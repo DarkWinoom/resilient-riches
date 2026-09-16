@@ -23,6 +23,7 @@ export function createDashboardService(database: AppDatabase, clock: () => strin
       through: range.to,
       timeline: 'period',
       includeCurve: true,
+      includeOpeningHistory: true,
     });
     return {
       today,
@@ -69,10 +70,12 @@ export function createDashboardService(database: AppDatabase, clock: () => strin
       through: data.range.to,
       timeline: 'period',
       includeCurve: true,
+      includeOpeningHistory: true,
     });
     const days = new Map(ledger.categories[0]!.days.map((day) => [day.date, day]));
     return {
       category,
+      days: ledger.portfolio.days,
       range: data.range,
       curve: ledger.portfolio.curve ?? [],
       records: entries

@@ -2,9 +2,11 @@
 import { computed, ref } from 'vue';
 import { parseDate } from '@resilient-riches/core';
 import type { CalendarResponse } from '@resilient-riches/core';
+import LoadingIndicator from './ui/LoadingIndicator.vue';
 import AppIcon from './ui/AppIcon.vue';
 import AppField from './ui/AppField.vue';
 const props = defineProps<{
+  minDate?: string | undefined;
   month: string;
   date: string;
   today: string;
@@ -13,6 +15,10 @@ const props = defineProps<{
   disabled: boolean;
   error: string;
 }>();
+const minimumMonth = computed(() => props.minDate?.slice(0, 7) ?? '0001-01');
+const beforeOpeningReason = computed(() =>
+  props.minDate ? `该分类于 ${props.minDate} 启用，不能录入更早日期` : '已到支持的最早日期',
+);
 const emit = defineEmits<{ date: [value: string]; month: [value: string]; retry: [] }>();
 const choosing = ref(false),
   year = ref(props.month.slice(0, 4));
@@ -51,20 +57,21 @@ function pickMonth(value: number) {
 }
 </script>
 <template>
-  <aside class="entry-calendar">
+  <aside class="entry-calendar loading-region" :aria-busy="loading">
+    <LoadingIndicator v-if="loading" label="正在读取日历" />
     <div class="calendar-heading">
       <button
         class="icon-button"
         aria-label="上个月"
-        :disabled="disabled || month === '0001-01'"
-        :data-disabled-reason="disabled ? '正在保存，请稍候再切换日期' : '已到支持的最早月份'"
+        :disabled="disabled || month <= minimumMonth"
+        :data-disabled-reason="disabled ? '正在处理，请稍候再切换日期' : beforeOpeningReason"
         @click="emit('month', adjacent(-1))"
       >
         <AppIcon name="caret-left" /></button
       ><button
         class="calendar-title"
         :disabled="disabled"
-        :data-disabled-reason="disabled ? '正在保存，请稍候再选择月份' : undefined"
+        :data-disabled-reason="disabled ? '正在处理，请稍候再选择月份' : undefined"
         @click="
           year = month.slice(0, 4);
           choosing = !choosing;
@@ -75,7 +82,7 @@ function pickMonth(value: number) {
         class="icon-button"
         aria-label="下个月"
         :disabled="disabled || month >= today.slice(0, 7)"
-        :data-disabled-reason="disabled ? '正在保存，请稍候再切换日期' : '不能选择未来月份'"
+        :data-disabled-reason="disabled ? '正在处理，请稍候再切换日期' : undefined"
         @click="emit('month', adjacent(1))"
       >
         <AppIcon name="caret-right" />
@@ -96,14 +103,17 @@ function pickMonth(value: number) {
           :disabled="
             disabled ||
             !yearValid ||
-            `${year}-${String(value).padStart(2, '0')}` > today.slice(0, 7)
+            `${year}-${String(value).padStart(2, '0')}` > today.slice(0, 7) ||
+            `${year}-${String(value).padStart(2, '0')}` < minimumMonth
           "
           :data-disabled-reason="
             disabled
-              ? '正在保存，请稍候再切换日期'
+              ? '正在处理，请稍候再切换日期'
               : !yearValid
                 ? '请先输入有效年份'
-                : '不能选择未来月份'
+                : `${year}-${String(value).padStart(2, '0')}` < minimumMonth
+                  ? beforeOpeningReason
+                  : undefined
           "
           @click="pickMonth(value)"
         >
@@ -120,8 +130,14 @@ function pickMonth(value: number) {
           ><button
             v-if="value"
             :class="['calendar-day', { active: value === date, today: value === today }]"
-            :disabled="disabled || value > today"
-            :data-disabled-reason="disabled ? '正在保存，请稍候再切换日期' : '不能录入未来日期'"
+            :disabled="disabled || value > today || (!!minDate && value < minDate)"
+            :data-disabled-reason="
+              disabled
+                ? '正在处理，请稍候再切换日期'
+                : minDate && value < minDate
+                  ? beforeOpeningReason
+                  : undefined
+            "
             :aria-label="`${value}${loading ? '' : count(value) ? `，${count(value)}个分类有记录，${complete(value) ? '全部录入' : '部分录入'}` : '，无记录'}`"
             :aria-pressed="value === date"
             @click="emit('date', value)"
@@ -141,13 +157,12 @@ function pickMonth(value: number) {
       ><button
         class="text-button"
         :disabled="disabled"
-        :data-disabled-reason="disabled ? '正在保存，请稍候再切换日期' : undefined"
+        :data-disabled-reason="disabled ? '正在处理，请稍候再切换日期' : undefined"
         @click="emit('date', today)"
       >
         回到今天
       </button>
     </div>
-    <p v-if="loading" class="muted" role="status">读取日历中…</p>
     <p v-if="error" class="field-error" role="alert">
       {{ error }}<button class="text-button" @click="emit('retry')">重试</button>
     </p>

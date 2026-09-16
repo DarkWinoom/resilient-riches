@@ -16,7 +16,7 @@ describe('server foundation', () => {
       expect(response.json()).toEqual({
         status: 'ok',
         database: 'ok',
-        schemaVersion: 1,
+        schemaVersion: 2,
         currency: 'CNY',
         timezone: 'Asia/Shanghai',
       });

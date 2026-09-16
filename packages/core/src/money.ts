@@ -6,7 +6,7 @@ export const MAX_TOTAL_MINOR = 9_223_372_036_854_775_807n;
 export const FinancialDecimal = Decimal.clone({ precision: 50, rounding: Decimal.ROUND_HALF_UP });
 
 export function parseMoney(value: unknown, field = 'amount', signed = true): bigint {
-  if (typeof value !== 'string' || !/^-?(?:0|[1-9]\d*)(?:\.\d{1,2})?$/.test(value)) {
+  if (typeof value !== 'string' || !/^-?(?:0|[1-9]\d*)(?:\.\d{0,2})?$/.test(value)) {
     throw new LedgerError('INVALID_MONEY', '金额必须是最多两位小数的十进制字符串', field);
   }
   const negative = value.startsWith('-');

@@ -82,6 +82,12 @@ export const api = {
   createCategory: (values: CategoryValues) => request<CategoryView>('/categories', 'POST', values),
   updateCategory: (id: string, values: CategoryPatch) =>
     request<CategoryView>(`/categories/${encodeURIComponent(id)}`, 'PATCH', values),
+  liquidate: (id: string, revision: number, pnl: string) =>
+    request<CategoryView>(`/categories/${encodeURIComponent(id)}/liquidate`, 'POST', {
+      revision,
+      pnl,
+      confirm: true,
+    }),
   reorder: (items: { id: string; revision: number }[]) =>
     request<CategoryListResponse>('/categories/order', 'PUT', { items }),
   deletionImpact: (id: string) =>

@@ -10,6 +10,7 @@ import {
   rateLabel,
   lastEntryLabel,
 } from '../../utils/format.ts';
+import LoadingIndicator from '../ui/LoadingIndicator.vue';
 import BaseOverlay from '../ui/BaseOverlay.vue';
 import AppButton from '../ui/AppButton.vue';
 import AppIcon from '../ui/AppIcon.vue';
@@ -31,7 +32,8 @@ const sharing = ref(false);
 </script>
 <template>
   <BaseOverlay title="收益报表" kind="drawer" class="report-drawer" @request-close="$emit('close')"
-    ><div class="report-body">
+    ><div class="report-body loading-region" :aria-busy="loading">
+      <LoadingIndicator v-if="loading" label="正在读取报表" />
       <PeriodPicker
         :period="period"
         :anchor="anchor"
@@ -45,7 +47,6 @@ const sharing = ref(false);
         }}<span v-if="data">，当前仍显示 {{ data.range.from }} — {{ data.range.to }}。</span
         ><AppButton variant="quiet" @click="load">重试</AppButton>
       </div>
-      <p v-if="loading && !data" role="status">正在生成报表…</p>
       <template v-if="data"
         ><div class="report-title">
           <div>
@@ -81,7 +82,12 @@ const sharing = ref(false);
           <h3><AppIcon name="note-pencil" />本期简评</h3>
           <p v-for="(line, index) in data.commentary" :key="index">{{ line }}</p>
         </section>
-        <ReturnChart :points="data.curve" :private-mode="privateMode" :loading="loading" />
+        <ReturnChart
+          v-if="data.period !== 'day'"
+          :points="data.curve"
+          :private-mode="privateMode"
+          :loading="loading"
+        />
         <section class="report-categories">
           <div class="section-heading">
             <h3>分类收益</h3>

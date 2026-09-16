@@ -3,6 +3,7 @@ import {
   calculateLedger,
   parseDate,
   parseMoney,
+  FinancialDecimal,
   validateCategory,
   validateEntryDate,
 } from '@resilient-riches/core';
@@ -36,7 +37,11 @@ const stamp = "updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
 
 export function createLedgerService(database: AppDatabase, currentDate: () => string) {
   const category = (id: string): CategoryRecord => {
-    const row = database.prepare('SELECT * FROM categories WHERE id = ?').get(id);
+    const row = database
+      .prepare(
+        'SELECT * FROM categories c WHERE id = ? AND NOT EXISTS (SELECT 1 FROM categories n WHERE n.previous_cycle_id=c.id)',
+      )
+      .get(id);
     if (!row) throw new ApiError(404, 'CATEGORY_NOT_FOUND', '分类不存在或已被删除');
     return categoryFromRow(row);
   };
@@ -44,17 +49,23 @@ export function createLedgerService(database: AppDatabase, currentDate: () => st
     if (actual !== expected)
       throw new ApiError(409, 'REVISION_CONFLICT', '数据已在其他页面更新，请重新载入后再保存');
   };
-  const checkName = (name: string, id: string) => {
+  const checkName = (name: string, id: string, previousId?: string | null) => {
     if (
       database
-        .prepare('SELECT id FROM categories WHERE name = ? COLLATE NOCASE AND id <> ?')
-        .get(name, id)
+        .prepare(
+          `WITH RECURSIVE ancestors(id) AS (SELECT ? UNION ALL SELECT c.previous_cycle_id FROM categories c JOIN ancestors a ON c.id=a.id WHERE c.previous_cycle_id IS NOT NULL), descendants(id) AS (SELECT ? UNION ALL SELECT c.id FROM categories c JOIN descendants d ON c.previous_cycle_id=d.id) SELECT id FROM categories WHERE name=? COLLATE NOCASE AND id<>? AND id NOT IN (SELECT id FROM ancestors WHERE id IS NOT NULL) AND id NOT IN (SELECT id FROM descendants WHERE id IS NOT NULL)`,
+        )
+        .get(previousId ?? id, id, name, id)
     ) {
       throw new ApiError(409, 'DUPLICATE_NAME', '已存在同名分类', 'name');
     }
   };
   const validateBook = () =>
-    calculateLedger({ ...loadLedgerInput(database), through: currentDate(), timeline: 'events' });
+    calculateLedger({
+      ...loadLedgerInput(database, true),
+      through: currentDate(),
+      timeline: 'events',
+    });
   const withBalance = (record: CategoryRecord, ledger: ReturnType<typeof validateBook>) => {
     const summary = ledger.categories.find((item) => item.categoryId === record.id)?.summary;
     return {
@@ -64,6 +75,13 @@ export function createLedgerService(database: AppDatabase, currentDate: () => st
       lastRecordedDate: summary?.lastRecordedDate ?? null,
     };
   };
+  const cycleIds = (id: string) =>
+    database
+      .prepare(
+        'WITH RECURSIVE cycles(id) AS (SELECT ? UNION ALL SELECT c.previous_cycle_id FROM categories c JOIN cycles ON c.id=cycles.id WHERE c.previous_cycle_id IS NOT NULL) SELECT id FROM cycles',
+      )
+      .all(id)
+      .map((row) => String(row.id));
   const bumpCategory = (id: string) =>
     database
       .prepare(`UPDATE categories SET revision = revision + 1, ${stamp} WHERE id = ?`)
@@ -72,7 +90,7 @@ export function createLedgerService(database: AppDatabase, currentDate: () => st
     validateCategory(values);
     validateEntryDate(values.openingDate, currentDate());
     if (values.archivedOn) validateEntryDate(values.archivedOn, currentDate());
-    checkName(values.name, values.id);
+    checkName(values.name, values.id, values.previousCycleId);
   };
 
   const listCategories = (): CategoryListResponse => {
@@ -105,6 +123,11 @@ export function createLedgerService(database: AppDatabase, currentDate: () => st
         .filter((item) => item.openingDate <= date && (!item.archivedOn || item.archivedOn >= date))
         .map((item) => ({
           category: item,
+          priorPnl: new FinancialDecimal(
+            ledger.categories.find((value) => value.categoryId === item.id)!.summary.cumulativePnl,
+          )
+            .minus(days.get(item.id)?.pnl ?? '0')
+            .toFixed(2),
           entry:
             input.entries.find((entry) => entry.categoryId === item.id && entry.date === date) ??
             null,
@@ -133,14 +156,32 @@ export function createLedgerService(database: AppDatabase, currentDate: () => st
           createdAt: '',
           updatedAt: '',
         };
+        if (values.previousCycleId) {
+          const previous = category(values.previousCycleId);
+          if (!previous.archivedOn)
+            throw new ApiError(400, 'NOT_LIQUIDATED', '仅已清仓分类可以重新激活');
+          if (values.openingDate < previous.archivedOn)
+            throw new ApiError(
+              400,
+              'INVALID_REOPEN_DATE',
+              '新持仓启用日期不能早于上一轮清仓日期',
+              'openingDate',
+            );
+          if (
+            database.prepare('SELECT id FROM categories WHERE previous_cycle_id=?').get(previous.id)
+          )
+            throw new ApiError(409, 'ALREADY_REOPENED', '此分类已经重新激活，请编辑新的持仓');
+        }
         validateValues(draft);
-        const next =
-          database.prepare('SELECT coalesce(max(sort_order), -1) + 1 AS next FROM categories').get()
-            ?.next ?? 0n;
+        const next = values.previousCycleId
+          ? category(values.previousCycleId).sortOrder
+          : (database
+              .prepare('SELECT coalesce(max(sort_order), -1) + 1 AS next FROM categories')
+              .get()?.next ?? 0n);
         database
           .prepare(
-            `INSERT INTO categories (id,name,color,opening_date,opening_balance_minor,historical_pnl_minor,note,sort_order)
-          VALUES (?,?,?,?,?,?,?,?)`,
+            `INSERT INTO categories (id,name,color,opening_date,opening_balance_minor,historical_pnl_minor,note,sort_order,previous_cycle_id)
+          VALUES (?,?,?,?,?,?,?,?,?)`,
           )
           .run(
             id,
@@ -151,6 +192,7 @@ export function createLedgerService(database: AppDatabase, currentDate: () => st
             parseMoney(draft.historicalPnl),
             draft.note,
             next,
+            values.previousCycleId ?? null,
           );
         return withBalance(category(id), validateBook());
       });
@@ -159,7 +201,18 @@ export function createLedgerService(database: AppDatabase, currentDate: () => st
       return database.transaction(() => {
         const current = category(id);
         checkRevision(current.revision, patch.revision);
+        if (
+          patch.previousCycleId !== undefined &&
+          patch.previousCycleId !== current.previousCycleId
+        )
+          throw new ApiError(400, 'IMMUTABLE_CYCLE', '不能修改持仓轮次关联');
         const draft = { ...current, ...patch, name: (patch.name ?? current.name).trim() };
+        if (
+          current.archivedOn &&
+          patch.archivedOn === null &&
+          database.prepare('SELECT id FROM categories WHERE previous_cycle_id=?').get(id)
+        )
+          throw new ApiError(409, 'ALREADY_REOPENED', '该轮持仓已有新的持仓，不能恢复旧轮次');
         validateValues(draft);
         database
           .prepare(
@@ -175,6 +228,36 @@ export function createLedgerService(database: AppDatabase, currentDate: () => st
             draft.archivedOn,
             id,
           );
+        return withBalance(category(id), validateBook());
+      });
+    },
+    liquidate(id: string, revision: number, pnl: string) {
+      return database.transaction(() => {
+        const current = category(id);
+        checkRevision(current.revision, revision);
+        if (current.archivedOn) throw new ApiError(409, 'ALREADY_LIQUIDATED', '分类已经清仓');
+        const date = currentDate();
+        const item = readDay(date).items.find((item) => item.category.id === id)!;
+        const existing = item.entry;
+        const amount = parseMoney(pnl, 'liquidationPnl');
+        if (existing?.liquidationPnl != null)
+          throw new ApiError(409, 'ALREADY_LIQUIDATED', '当天已有清仓记录，请从记录日历修改');
+        if (existing) {
+          database
+            .prepare(
+              `UPDATE daily_entries SET liquidation_pnl_minor=?,revision=revision+1,${stamp} WHERE id=?`,
+            )
+            .run(amount, existing.id);
+        } else {
+          database
+            .prepare(
+              'INSERT INTO daily_entries (id,category_id,date,closing_balance_minor,buy_minor,sell_minor,note,liquidation_pnl_minor) VALUES (?,?,?,?,0,0,?,?)',
+            )
+            .run(randomUUID(), id, date, parseMoney(item.openingBalance), '', amount);
+        }
+        database
+          .prepare(`UPDATE categories SET archived_on=?,revision=revision+1,${stamp} WHERE id=?`)
+          .run(date, id);
         return withBalance(category(id), validateBook());
       });
     },
@@ -200,7 +283,7 @@ export function createLedgerService(database: AppDatabase, currentDate: () => st
       const current = category(id);
       const row = database
         .prepare(
-          'SELECT count(*) AS count,min(date) AS first,max(date) AS last FROM daily_entries WHERE category_id=?',
+          'WITH RECURSIVE cycles(id) AS (SELECT ? UNION ALL SELECT c.previous_cycle_id FROM categories c JOIN cycles ON c.id=cycles.id WHERE c.previous_cycle_id IS NOT NULL) SELECT count(*) AS count,min(date) AS first,max(date) AS last FROM daily_entries WHERE category_id IN (SELECT id FROM cycles)',
         )
         .get(id);
       return {
@@ -213,7 +296,8 @@ export function createLedgerService(database: AppDatabase, currentDate: () => st
     deleteCategory(id: string, revision: number) {
       database.transaction(() => {
         checkRevision(category(id).revision, revision);
-        database.prepare('DELETE FROM categories WHERE id=?').run(id);
+        for (const cycleId of cycleIds(id))
+          database.prepare('DELETE FROM categories WHERE id=?').run(cycleId);
         validateBook();
       });
       return { ok: true };
@@ -243,12 +327,22 @@ export function createLedgerService(database: AppDatabase, currentDate: () => st
           const closing = parseMoney(entry.closingBalance, 'closingBalance', false);
           const buy = parseMoney(entry.buy, 'buy', false);
           const sell = parseMoney(entry.sell, 'sell', false);
+          const liquidation =
+            entry.liquidationPnl == null
+              ? null
+              : parseMoney(entry.liquidationPnl, 'liquidationPnl');
+          if ((existing?.liquidation_pnl_minor != null) !== (liquidation !== null))
+            throw new ApiError(
+              400,
+              'LIQUIDATION_MODE',
+              '请通过分类清仓操作创建清仓记录；已有清仓记录需保留清仓盈亏',
+            );
           if (existing) {
             database
               .prepare(
-                `UPDATE daily_entries SET closing_balance_minor=?,buy_minor=?,sell_minor=?,note=?,revision=revision+1,${stamp} WHERE id=?`,
+                `UPDATE daily_entries SET closing_balance_minor=?,buy_minor=?,sell_minor=?,note=?,liquidation_pnl_minor=?,revision=revision+1,${stamp} WHERE id=?`,
               )
-              .run(closing, buy, sell, entry.note, existing.id ?? null);
+              .run(closing, buy, sell, entry.note, liquidation, existing.id ?? null);
           } else {
             database
               .prepare(
@@ -269,7 +363,22 @@ export function createLedgerService(database: AppDatabase, currentDate: () => st
         const entry = entryFromRow(row);
         checkRevision(entry.revision, revision);
         checkRevision(category(entry.categoryId).revision, categoryRevision);
+        if (
+          entry.liquidationPnl != null &&
+          database
+            .prepare('SELECT id FROM categories WHERE previous_cycle_id=?')
+            .get(entry.categoryId)
+        )
+          throw new ApiError(
+            409,
+            'CYCLE_HAS_SUCCESSOR',
+            '此轮已重新激活，请修改最终盈亏；不能删除上一轮清仓结算',
+          );
         database.prepare('DELETE FROM daily_entries WHERE id=?').run(id);
+        if (entry.liquidationPnl != null && category(entry.categoryId).archivedOn === entry.date)
+          database
+            .prepare('UPDATE categories SET archived_on=NULL WHERE id=?')
+            .run(entry.categoryId);
         bumpCategory(entry.categoryId);
         validateBook();
         return readDay(entry.date);
@@ -280,7 +389,7 @@ export function createLedgerService(database: AppDatabase, currentDate: () => st
       validateEntryDate(`${month}-01`, currentDate());
       const rows = database
         .prepare(
-          'SELECT e.date,count(*) AS count,(SELECT count(*) FROM categories c WHERE c.opening_date<=e.date AND (c.archived_on IS NULL OR c.archived_on>=e.date)) AS total FROM daily_entries e WHERE substr(e.date,1,7)=? GROUP BY e.date ORDER BY e.date',
+          'SELECT e.date,count(*) AS count,(SELECT count(*) FROM categories c WHERE c.opening_date<=e.date AND (c.archived_on IS NULL OR c.archived_on>=e.date) AND NOT EXISTS (SELECT 1 FROM categories n WHERE n.previous_cycle_id=c.id)) AS total FROM daily_entries e WHERE substr(e.date,1,7)=? AND NOT EXISTS (SELECT 1 FROM categories n WHERE n.previous_cycle_id=e.category_id) GROUP BY e.date ORDER BY e.date',
         )
         .all(month);
       return {

@@ -10,6 +10,7 @@ export interface Category {
 }
 
 export interface DailyEntry {
+  liquidationPnl?: string | null;
   categoryId: string;
   date: string;
   closingBalance: string;

@@ -13,6 +13,7 @@ const amount = { type: 'string', minLength: 1, maxLength: 16 };
 const revision = { type: 'integer', minimum: 1, maximum: 2147483647 };
 const note = { type: 'string', maxLength: 1000 };
 const categoryFields = {
+  previousCycleId: { anyOf: [id, { type: 'null' }] },
   name: { type: 'string', minLength: 1, maxLength: 40 },
   color: { type: 'string', pattern: '^#[0-9a-fA-F]{6}$' },
   openingDate: date,
@@ -108,7 +109,18 @@ export function registerLedgerRoutes(
   app.get('/api/v1/categories', () => service.listCategories());
   app.post<{ Body: CategoryValues }>(
     '/api/v1/categories',
-    { schema: { body: object(categoryFields) } },
+    {
+      schema: {
+        body: object(categoryFields, [
+          'name',
+          'color',
+          'openingDate',
+          'openingBalance',
+          'historicalPnl',
+          'note',
+        ]),
+      },
+    },
     (request, reply) => {
       const result = service.createCategory(request.body);
       reply.code(201);
@@ -127,6 +139,16 @@ export function registerLedgerRoutes(
       },
     },
     (request) => service.updateCategory(request.params.id, request.body),
+  );
+  app.post<{ Params: { id: string }; Body: { revision: number; pnl: string; confirm: true } }>(
+    '/api/v1/categories/:id/liquidate',
+    {
+      schema: {
+        params: idParams,
+        body: object({ revision, pnl: amount, confirm: { const: true } }),
+      },
+    },
+    (request) => service.liquidate(request.params.id, request.body.revision, request.body.pnl),
   );
   app.put<{ Body: { items: { id: string; revision: number }[] } }>(
     '/api/v1/categories/order',
@@ -161,15 +183,27 @@ export function registerLedgerRoutes(
           entries: {
             type: 'array',
             minItems: 1,
-            items: object({
-              categoryId: id,
-              categoryRevision: revision,
-              revision: { anyOf: [revision, { type: 'null' }] },
-              closingBalance: amount,
-              buy: amount,
-              sell: amount,
-              note,
-            }),
+            items: object(
+              {
+                liquidationPnl: { anyOf: [amount, { type: 'null' }] },
+                categoryId: id,
+                categoryRevision: revision,
+                revision: { anyOf: [revision, { type: 'null' }] },
+                closingBalance: amount,
+                buy: amount,
+                sell: amount,
+                note,
+              },
+              [
+                'categoryId',
+                'categoryRevision',
+                'revision',
+                'closingBalance',
+                'buy',
+                'sell',
+                'note',
+              ],
+            ),
           },
         }),
       },

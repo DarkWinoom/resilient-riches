@@ -1,4 +1,11 @@
-import type { Category, DailyEntry, PerformanceSummary, CurvePoint, RateReason } from './types.ts';
+import type {
+  Category,
+  DailyEntry,
+  DayResult,
+  PerformanceSummary,
+  CurvePoint,
+  RateReason,
+} from './types.ts';
 import type { DateRange, Period } from './dates.ts';
 
 export interface DashboardCategory extends CategoryView {
@@ -19,6 +26,7 @@ export interface DashboardResponse {
   performance: PerformanceSummary;
 }
 export interface CategoryDetailResponse {
+  days: DayResult[];
   category: DashboardCategory;
   range: DateRange;
   curve: CurvePoint[];
@@ -48,6 +56,7 @@ export interface ReportResponse {
 }
 
 export interface CategoryValues {
+  previousCycleId?: string | null;
   name: string;
   color: string;
   openingDate: string;
@@ -57,6 +66,7 @@ export interface CategoryValues {
 }
 
 export interface CategoryRecord extends Category {
+  previousCycleId?: string | null;
   note: string;
   archivedOn: string | null;
   sortOrder: number;
@@ -90,6 +100,7 @@ export interface EntryRecord extends DailyEntry {
 }
 
 export interface EntryWrite {
+  liquidationPnl?: string | null;
   categoryId: string;
   categoryRevision: number;
   revision: number | null;
@@ -100,6 +111,7 @@ export interface EntryWrite {
 }
 
 export interface EntryDayItem {
+  priorPnl?: string;
   category: CategoryRecord;
   entry: EntryRecord | null;
   openingBalance: string;
