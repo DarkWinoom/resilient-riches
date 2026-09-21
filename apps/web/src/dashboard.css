@@ -167,6 +167,10 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
 }
+.chart-panel,
+.dashboard-workspace .holdings-panel {
+  --panel-inset: 20px;
+}
 .chart-panel {
   height: 360px;
   background: #fff;
@@ -180,17 +184,22 @@
 .return-panel {
   grid-column: span 3;
 }
-.chart-heading {
+.chart-heading,
+.dashboard-workspace .panel-heading {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 16px;
-  padding: 20px 22px 10px;
-  min-height: 60px;
+  padding: 12px var(--panel-inset);
+  min-height: 56px;
   flex-shrink: 0;
 }
-.chart-heading h2 {
+.chart-heading h2,
+.dashboard-workspace .panel-heading h2 {
   font-size: 18px;
+  font-weight: 600;
+  line-height: 24px;
+  margin: 0;
   white-space: nowrap;
 }
 .chart-modes {
@@ -213,7 +222,7 @@
   position: relative;
   flex: 1;
   min-height: 0;
-  margin: 0 14px 9px;
+  margin: 0 var(--panel-inset) 16px;
   outline-offset: -3px !important;
 }
 .return-plot svg {
@@ -311,7 +320,7 @@
   flex: 1;
   overflow: auto;
   scrollbar-width: thin;
-  padding: 0 22px 12px;
+  padding: 0 var(--panel-inset) 16px;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -373,9 +382,6 @@
 .dashboard-workspace .holdings-panel {
   min-height: 226px;
 }
-.dashboard-workspace .panel-heading {
-  padding: 10px 22px;
-}
 .dashboard-table col {
   width: 12%;
 }
@@ -401,7 +407,7 @@
 }
 .dashboard-table th:first-child,
 .dashboard-table td:first-child {
-  padding-left: 22px;
+  padding-left: var(--panel-inset);
 }
 .dashboard-table th:last-child,
 .dashboard-table td:last-child {
@@ -524,22 +530,13 @@
   font-weight: 500;
 }
 @media (min-width: 1600px) {
-  .summary-card,
-  .chart-heading {
+  .summary-card {
     padding-left: 26px;
     padding-right: 26px;
   }
-  .allocation-list {
-    padding-left: 26px;
-    padding-right: 26px;
-  }
-  .dashboard-workspace .panel-heading {
-    padding-left: 26px;
-    padding-right: 26px;
-  }
-  .dashboard-table th:first-child,
-  .dashboard-table td:first-child {
-    padding-left: 26px;
+  .chart-panel,
+  .dashboard-workspace .holdings-panel {
+    --panel-inset: 24px;
   }
 }
 @media (max-width: 1100px) {
@@ -552,13 +549,9 @@
   .summary-foot {
     gap: 7px;
   }
-  .chart-heading {
-    padding-left: 18px;
-    padding-right: 18px;
-  }
-  .allocation-list {
-    padding-left: 18px;
-    padding-right: 18px;
+  .chart-panel,
+  .dashboard-workspace .holdings-panel {
+    --panel-inset: 18px;
   }
   .chart-heading .muted {
     white-space: nowrap;
@@ -567,10 +560,6 @@
   .dashboard-table td {
     padding-left: 10px;
     padding-right: 10px;
-  }
-  .dashboard-table th:first-child,
-  .dashboard-table td:first-child {
-    padding-left: 18px;
   }
   .dashboard-table .holding-name {
     gap: 8px;
@@ -602,9 +591,6 @@
   }
   .return-panel {
     grid-column: auto;
-  }
-  .allocation-list {
-    padding-bottom: 16px;
   }
   .allocation-row {
     flex-basis: max(70px, calc(100% / var(--allocation-count)));
@@ -720,18 +706,12 @@
   .period-marker {
     width: 40px;
   }
-  .chart-heading {
-    padding: 18px 16px 10px;
+  .chart-panel,
+  .dashboard-workspace .holdings-panel {
+    --panel-inset: 16px;
   }
   .chart-modes {
     gap: 12px;
-  }
-  .return-plot {
-    margin-left: 0;
-    margin-right: 6px;
-  }
-  .dashboard-workspace .panel-heading {
-    padding: 14px 16px;
   }
   .dashboard-table colgroup {
     display: none;
@@ -842,13 +822,13 @@
 }
 
 .category-create {
-  background: #e4ece5;
-  color: #47614c;
-  border-color: #d2dfd4;
+  background: #f4edde;
+  color: var(--gold);
+  border-color: #e4d4b3;
 }
 .category-create:hover:not(:disabled) {
-  background: #d7e4da;
-  border-color: #b9cdbd;
+  background: #eadcc0;
+  border-color: #d5bf95;
 }
 .record-menu {
   position: relative;
@@ -938,7 +918,7 @@
 .chart-scope {
   color: var(--muted);
   font-size: 14px;
-  padding: 0 22px 6px;
+  padding: 0 var(--panel-inset) 6px;
 }
 
 .period-controls--all .range-label {
