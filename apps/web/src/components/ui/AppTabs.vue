@@ -125,7 +125,16 @@ onUnmounted(() => observer?.disconnect());
         :data-disabled-reason="disabled ? '正在读取或保存记录，请稍候再切换分类' : undefined"
         @click="emit('update:modelValue', item.id)"
       >
-        {{ item.label }}<span v-if="item.badge" class="tab-badge">{{ item.badge }}</span>
+        {{ item.label
+        }}<span
+          v-if="item.badge"
+          class="tab-badge"
+          :class="{ 'tab-badge--recorded': item.badge === '已录入' }"
+          :title="item.badge"
+          ><template v-if="item.badge === '已录入'"
+            ><AppIcon name="check" /><span class="sr-only">已录入</span></template
+          ><template v-else>{{ item.badge }}</template></span
+        >
       </button>
       <span class="tab-marker" :style="marker" aria-hidden="true"></span>
     </div>

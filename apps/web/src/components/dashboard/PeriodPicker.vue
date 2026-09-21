@@ -79,8 +79,9 @@ function select(date: string) {
         "
         @click="choosing = true"
       >
-        {{ range.from
-        }}<span v-if="range.to !== range.from || period === 'all'"> ~ {{ range.to }}</span
+        <span>{{
+          range.to !== range.from || period === 'all' ? `${range.from} ~ ${range.to}` : range.from
+        }}</span
         ><AppIcon name="calendar-blank" /></button
       ><button
         class="icon-button"
