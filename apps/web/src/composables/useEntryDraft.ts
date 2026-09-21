@@ -18,7 +18,7 @@ export interface EntryDraft {
 export function useEntryDraft(
   today: string,
   initialId: string | null,
-  changed: (action: 'save' | 'delete') => void,
+  changed: (action: 'save' | 'delete', date: string, today: string) => void,
   initialDate = today,
   onlyCategoryId: string | null = null,
 ) {
@@ -206,7 +206,7 @@ export function useEntryDraft(
       touched.value = true;
       message.value = `已保存 ${ids.length} 个分类的记录`;
       success(message.value);
-      changed('save');
+      changed('save', result.date, result.today);
       await loadCalendar();
     } catch (failure) {
       error.value = errorMessage(failure);
@@ -227,7 +227,7 @@ export function useEntryDraft(
       touched.value = true;
       message.value = '记录已删除';
       success('记录已删除');
-      changed('delete');
+      changed('delete', result.date, result.today);
       await loadCalendar();
     } catch (failure) {
       error.value = errorMessage(failure);

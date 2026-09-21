@@ -51,7 +51,7 @@ function select(date: string) {
 }
 </script>
 <template>
-  <div class="period-controls">
+  <div class="period-controls" :class="{ 'period-controls--all': period === 'all' }">
     <div class="range-controls">
       <button
         v-if="period !== 'all'"

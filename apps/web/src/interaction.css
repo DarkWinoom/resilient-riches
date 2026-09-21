@@ -292,3 +292,12 @@
     animation: none;
   }
 }
+
+.entry-content--single .entry-panel {
+  margin-top: 20px;
+}
+.return-plot:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 3px;
+  border-radius: 6px;
+}

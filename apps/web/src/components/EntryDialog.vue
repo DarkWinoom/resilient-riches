@@ -44,9 +44,9 @@ const {
 } = useEntryDraft(
   props.today,
   props.initialId,
-  (action) => {
+  (action, savedDate, serverToday) => {
     emit('changed');
-    if (action === 'save' && date.value === props.today) emit('close');
+    if (action === 'save' && savedDate === serverToday) emit('close');
   },
   props.initialDate,
   props.singleCategory ? props.initialId : null,
@@ -144,7 +144,11 @@ async function deleteRecord() {
         @month="changeMonth"
         @retry="loadCalendar"
       />
-      <section class="entry-content loading-region" :aria-busy="loading">
+      <section
+        class="entry-content loading-region"
+        :class="{ 'entry-content--single': singleCategory }"
+        :aria-busy="loading"
+      >
         <LoadingIndicator v-if="loading" label="正在读取记录" />
         <div class="section-heading">
           <h3>{{ date }}</h3>

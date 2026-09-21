@@ -776,4 +776,15 @@ describe('bookkeeping UI with real ledger API', () => {
     expect(wrapper.emitted('close')).toHaveLength(1);
     expect(wrapper.text()).not.toContain('关闭记录窗口？');
   });
+  it('uses the server business date when deciding whether a saved window should close', async () => {
+    const category = await create();
+    wrapper = mount(EntryDialog, { props: { today, initialId: category.id }, global });
+    await settle();
+    businessDate = '2026-09-14';
+    await wrapper.get('#entry-balance').setValue('1100');
+    await button('保存当日记录').trigger('click');
+    await settle();
+    expect(wrapper.emitted('close')).toBeUndefined();
+    expect(button('保存当日记录').attributes('disabled')).toBeDefined();
+  });
 });

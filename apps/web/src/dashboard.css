@@ -940,3 +940,8 @@
   font-size: 14px;
   padding: 0 22px 6px;
 }
+
+.period-controls--all .range-label {
+  opacity: 1;
+  cursor: default;
+}
