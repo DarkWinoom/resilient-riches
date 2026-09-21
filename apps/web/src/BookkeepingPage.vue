@@ -96,7 +96,7 @@ async function record(id: string | null = null, date?: string, single = false) {
           />
         </div>
         <div v-if="error" class="performance-error" role="alert">
-          {{ error }}；当前仍显示 {{ data.range.from }} — {{ data.range.to }}。<button
+          {{ error }}；当前仍显示 {{ data.range.from }} ~ {{ data.range.to }}。<button
             class="text-button"
             @click="load(false)"
           >

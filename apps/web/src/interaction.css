@@ -49,8 +49,13 @@
 .entry-overlay .entry-content {
   padding-block: 20px;
 }
-.entry-overlay .tabs {
+.entry-overlay .category-tabs {
   margin: 10px 0 16px;
+  height: 46px;
+  min-height: 46px;
+}
+.entry-overlay .tabs {
+  margin: 0;
   height: 46px;
   min-height: 46px;
 }
@@ -300,4 +305,99 @@
   outline: 2px solid var(--gold);
   outline-offset: 3px;
   border-radius: 6px;
+}
+
+.category-tabs {
+  position: relative;
+  min-width: 0;
+  width: 100%;
+  height: 64px;
+  min-height: 64px;
+  margin: 20px 0 24px;
+}
+.tabs--measuring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  visibility: hidden;
+  pointer-events: none;
+}
+.category-selector {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: calc(100% - 6px);
+  padding: 8px 12px;
+  background: #f8f5ed;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--gold);
+  text-align: left;
+  font-size: 14px;
+}
+.category-selector-caption {
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.category-selector strong {
+  min-width: 0;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+}
+.category-selector .tab-badge {
+  margin-left: 0;
+  flex-shrink: 0;
+}
+.category-selector > .ph-light {
+  flex-shrink: 0;
+}
+.category-switcher-overlay {
+  width: 480px;
+}
+.category-switcher-body {
+  padding: 20px 24px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow: auto;
+}
+.category-options {
+  max-height: min(420px, 55dvh);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.category-options > button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  width: 100%;
+  padding: 12px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  text-align: left;
+  color: inherit;
+  font-size: 14px;
+}
+.category-options > button > span:first-child {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.category-options > button[aria-selected='true'],
+.category-options > button:hover {
+  background: #f3eddf;
+  color: var(--gold);
+}
+.category-options .tab-badge {
+  flex-shrink: 0;
 }

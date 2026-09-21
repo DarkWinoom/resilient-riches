@@ -117,7 +117,7 @@ onUnmounted(() => controller?.abort());
         <p v-if="data.category.note && !privateMode" class="detail-note">
           {{ data.category.note }}
         </p>
-        <p class="muted">{{ data.range.from }} — {{ data.range.to }}</p>
+        <p class="muted">{{ data.range.from }} ~ {{ data.range.to }}</p>
         <div class="detail-chart">
           <ReturnChart :points="data.curve" :private-mode="privateMode" :loading="loading" />
         </div>

@@ -23,7 +23,7 @@ describe('period calendar and disabled explanations', () => {
     expect(wrapper.get('[aria-label="后12年"]').attributes('disabled')).toBeDefined();
     await wrapper.get('[aria-label="前12年"]').trigger('click');
     await flushPromises();
-    expect(wrapper.get('.year-page-controls').text()).toContain('2005 — 2016');
+    expect(wrapper.get('.year-page-controls').text()).toContain('2005 ~ 2016');
     const year = wrapper.findAll('[role="option"]').find((item) => item.text() === '2015')!;
     await year.find('.dp--overlay-cell').trigger('click');
     expect(wrapper.emitted('select')?.[0]).toEqual(['2015-01-01']);

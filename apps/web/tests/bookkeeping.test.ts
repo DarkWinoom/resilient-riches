@@ -308,7 +308,7 @@ describe('bookkeeping UI with real ledger API', () => {
     vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('offline'));
     await button('周').trigger('click');
     await settle();
-    expect(wrapper.get('[role="alert"]').text()).toContain('当前仍显示 2026-09-07 — 2026-09-13');
+    expect(wrapper.get('[role="alert"]').text()).toContain('当前仍显示 2026-09-07 ~ 2026-09-13');
     expect(wrapper.get('thead').text()).toContain('本月收益');
     await button('重试').trigger('click');
     await settle();
@@ -594,7 +594,8 @@ describe('bookkeeping UI with real ledger API', () => {
     await settle();
     expect(detail.get('.range-label').attributes('disabled')).toBeDefined();
     expect(detail.get('.range-label').text()).toContain('2026-09-01');
-    expect(detail.find('[aria-label="上一期间"]').exists()).toBe(false);
+    expect(detail.get('[aria-label="上一期间"]').attributes('disabled')).toBeDefined();
+    expect(detail.get('[aria-label="下一期间"]').attributes('disabled')).toBeDefined();
     expect(detail.find('.detail-chart').exists()).toBe(true);
     expect(wrapper.get('.performance-heading .period-segment [aria-pressed="true"]').text()).toBe(
       '年',

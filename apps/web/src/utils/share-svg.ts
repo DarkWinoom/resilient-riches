@@ -50,7 +50,7 @@ export function renderShareSvg(model: ShareModel): { svg: string; width: number;
       158,
       model.range.from === model.range.to
         ? `${model.current ? '截至 ' : ''}${model.range.to}`
-        : `${model.range.from} — ${model.current ? '截至 ' : ''}${model.range.to}`,
+        : `${model.range.from} ~ ${model.current ? '截至 ' : ''}${model.range.to}`,
       24,
       '#827a6e',
     ),

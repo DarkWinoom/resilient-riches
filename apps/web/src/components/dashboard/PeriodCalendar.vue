@@ -112,7 +112,7 @@ function select(value: ModelValue) {
       >
         <AppIcon name="caret-left" />
       </button>
-      <span aria-live="polite">{{ yearPage }} — {{ yearPage + 11 }}</span>
+      <span aria-live="polite">{{ yearPage }} ~ {{ yearPage + 11 }}</span>
       <button
         type="button"
         class="icon-button"

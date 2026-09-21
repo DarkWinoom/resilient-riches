@@ -54,11 +54,16 @@ function select(date: string) {
   <div class="period-controls" :class="{ 'period-controls--all': period === 'all' }">
     <div class="range-controls">
       <button
-        v-if="period !== 'all'"
         class="icon-button"
         aria-label="上一期间"
         :disabled="disabled || !adjacent(-1)"
-        :data-disabled-reason="disabled ? '正在读取收益数据，请稍候' : '已到支持的最早期间'"
+        :data-disabled-reason="
+          period === 'all'
+            ? '全部数据范围固定为启用日至今'
+            : disabled
+              ? '正在读取收益数据，请稍候'
+              : '已到支持的最早期间'
+        "
         @click="move(-1)"
       >
         <AppIcon name="caret-left" /></button
@@ -74,14 +79,20 @@ function select(date: string) {
         "
         @click="choosing = true"
       >
-        {{ range.from }}<span v-if="range.to !== range.from"> — {{ range.to }}</span
-        ><AppIcon v-if="period !== 'all'" name="calendar-blank" /></button
+        {{ range.from
+        }}<span v-if="range.to !== range.from || period === 'all'"> ~ {{ range.to }}</span
+        ><AppIcon name="calendar-blank" /></button
       ><button
-        v-if="period !== 'all'"
         class="icon-button"
         aria-label="下一期间"
         :disabled="disabled || !adjacent(1)"
-        :data-disabled-reason="disabled ? '正在读取收益数据，请稍候' : undefined"
+        :data-disabled-reason="
+          period === 'all'
+            ? '全部数据范围固定为启用日至今'
+            : disabled
+              ? '正在读取收益数据，请稍候'
+              : undefined
+        "
         @click="move(1)"
       >
         <AppIcon name="caret-right" />

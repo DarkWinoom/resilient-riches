@@ -46,7 +46,7 @@ const label = computed(() => periodLabel(data.value?.period ?? period.value, dat
       />
       <div v-if="error" class="error-banner" role="alert">
         {{ error
-        }}<span v-if="data">，当前仍显示 {{ data.range.from }} — {{ data.range.to }}。</span
+        }}<span v-if="data">，当前仍显示 {{ data.range.from }} ~ {{ data.range.to }}。</span
         ><AppButton variant="quiet" @click="load">重试</AppButton>
       </div>
       <template v-if="data"
@@ -56,7 +56,7 @@ const label = computed(() => periodLabel(data.value?.period ?? period.value, dat
             <h2>{{ reportTitles[data.period] }}</h2>
           </div>
           <span class="muted">{{
-            data.current ? `截至 ${data.range.to}` : `${data.range.from} — ${data.range.to}`
+            data.current ? `截至 ${data.range.to}` : `${data.range.from} ~ ${data.range.to}`
           }}</span>
         </div>
         <div class="report-metrics">
