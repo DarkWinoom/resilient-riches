@@ -11,7 +11,7 @@ describe('SQLite persistence and constraints', () => {
     const first = fixture.open(path);
     insertCategory(first);
     insertEntry(first);
-    expect(schemaVersion(first)).toBe(2);
+    expect(schemaVersion(first)).toBe(3);
     expect(first.prepare('PRAGMA journal_mode').get()?.journal_mode).toBe('wal');
     expect(first.prepare('PRAGMA foreign_keys').get()?.foreign_keys).toBe(1n);
     first.close();
@@ -20,7 +20,7 @@ describe('SQLite persistence and constraints', () => {
       second.prepare('SELECT closing_balance_minor FROM daily_entries').get()
         ?.closing_balance_minor,
     ).toBe(1010000n);
-    expect(second.prepare('SELECT count(*) AS count FROM schema_migrations').get()?.count).toBe(2n);
+    expect(second.prepare('SELECT count(*) AS count FROM schema_migrations').get()?.count).toBe(3n);
     expect(second.prepare('SELECT currency, timezone FROM app_settings').get()).toMatchObject({
       currency: 'CNY',
       timezone: 'Asia/Shanghai',
@@ -87,21 +87,21 @@ describe('SQLite persistence and constraints', () => {
     const database = fixture.open();
     insertCategory(database);
     const invalid = {
-      version: 3,
+      version: 4,
       name: 'broken',
       sql: 'CREATE TABLE attempt(id INTEGER); INSERT INTO nonexistent VALUES (1);',
     };
     expect(() => migrateDatabase(database, [...migrations, invalid])).toThrow();
-    expect(schemaVersion(database)).toBe(2);
+    expect(schemaVersion(database)).toBe(3);
     expect(
       database.prepare("SELECT name FROM sqlite_master WHERE name = 'attempt'").get(),
     ).toBeUndefined();
     expect(database.prepare('SELECT count(*) AS count FROM categories').get()?.count).toBe(1n);
     migrateDatabase(database, [
       ...migrations,
-      { version: 3, name: 'extra', sql: 'CREATE TABLE extra(id INTEGER) STRICT;' },
+      { version: 4, name: 'extra', sql: 'CREATE TABLE extra(id INTEGER) STRICT;' },
     ]);
-    expect(schemaVersion(database)).toBe(3);
+    expect(schemaVersion(database)).toBe(4);
   });
   it('rejects modified or missing applied migrations', () => {
     const database = fixture.open();
@@ -112,7 +112,7 @@ describe('SQLite persistence and constraints', () => {
     expect(() =>
       migrateDatabase(database, [{ version: 3, name: 'skip', sql: 'SELECT 1;' }]),
     ).toThrow('consecutive');
-    expect(schemaVersion(database)).toBe(2);
+    expect(schemaVersion(database)).toBe(3);
   });
   it('updates dependent lifetime bounds and cascades only explicitly removed categories', () => {
     const database = fixture.open();

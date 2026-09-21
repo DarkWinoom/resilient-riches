@@ -13,7 +13,7 @@ const amount = { type: 'string', minLength: 1, maxLength: 16 };
 const revision = { type: 'integer', minimum: 1, maximum: 2147483647 };
 const note = { type: 'string', maxLength: 1000 };
 const categoryFields = {
-  previousCycleId: { anyOf: [id, { type: 'null' }] },
+  includeInStats: { type: 'boolean' },
   name: { type: 'string', minLength: 1, maxLength: 40 },
   color: { type: 'string', pattern: '^#[0-9a-fA-F]{6}$' },
   openingDate: date,
@@ -39,7 +39,7 @@ export function registerLedgerRoutes(
   const dashboardService = createDashboardService(database, clock);
   const reportService = createReportService(database, clock);
   const periodQuery = object({
-    period: { type: 'string', enum: ['day', 'week', 'month', 'year'] },
+    period: { type: 'string', enum: ['day', 'week', 'month', 'year', 'all'] },
     anchor: date,
   });
   app.get<{ Querystring: { period: Period; anchor: string } }>(
@@ -132,23 +132,10 @@ export function registerLedgerRoutes(
     {
       schema: {
         params: idParams,
-        body: object(
-          { ...categoryFields, revision, archivedOn: { anyOf: [date, { type: 'null' }] } },
-          ['revision'],
-        ),
+        body: object({ ...categoryFields, revision }, ['revision']),
       },
     },
     (request) => service.updateCategory(request.params.id, request.body),
-  );
-  app.post<{ Params: { id: string }; Body: { revision: number; pnl: string; confirm: true } }>(
-    '/api/v1/categories/:id/liquidate',
-    {
-      schema: {
-        params: idParams,
-        body: object({ revision, pnl: amount, confirm: { const: true } }),
-      },
-    },
-    (request) => service.liquidate(request.params.id, request.body.revision, request.body.pnl),
   );
   app.put<{ Body: { items: { id: string; revision: number }[] } }>(
     '/api/v1/categories/order',
@@ -169,10 +156,10 @@ export function registerLedgerRoutes(
     { schema: { params: idParams, body: object({ revision, confirm: { const: true } }) } },
     (request) => service.deleteCategory(request.params.id, request.body.revision),
   );
-  app.get<{ Querystring: { date: string } }>(
+  app.get<{ Querystring: { date: string; categoryId?: string } }>(
     '/api/v1/entries',
-    { schema: { querystring: object({ date }) } },
-    (request) => service.readDay(request.query.date),
+    { schema: { querystring: object({ date, categoryId: id }, ['date']) } },
+    (request) => service.readDay(request.query.date, request.query.categoryId),
   );
   app.put<{ Body: { date: string; entries: EntryWrite[] } }>(
     '/api/v1/entries/batch',
@@ -224,9 +211,16 @@ export function registerLedgerRoutes(
     (request) =>
       service.deleteEntry(request.params.id, request.body.revision, request.body.categoryRevision),
   );
-  app.get<{ Querystring: { month: string } }>(
+  app.get<{ Querystring: { month: string; categoryId?: string } }>(
     '/api/v1/calendar',
-    { schema: { querystring: object({ month: { type: 'string', pattern: '^\\d{4}-\\d{2}$' } }) } },
-    (request) => service.calendar(request.query.month),
+    {
+      schema: {
+        querystring: object(
+          { month: { type: 'string', pattern: '^[0-9]{4}-[0-9]{2}$' }, categoryId: id },
+          ['month'],
+        ),
+      },
+    },
+    (request) => service.calendar(request.query.month, request.query.categoryId),
   );
 }

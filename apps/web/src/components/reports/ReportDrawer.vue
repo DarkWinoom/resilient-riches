@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
+import { periodLabel } from '@resilient-riches/core';
 import type { Period } from '@resilient-riches/core';
 import { useReport } from '../../composables/useReport.ts';
 import { reportTitles } from '../../utils/share-model.ts';
@@ -29,6 +30,7 @@ const { period, anchor, data, loading, error, load, choose } = useReport(
   props.initialAnchor,
 );
 const sharing = ref(false);
+const label = computed(() => periodLabel(data.value?.period ?? period.value, data.value?.current));
 </script>
 <template>
   <BaseOverlay title="收益报表" kind="drawer" class="report-drawer" @request-close="$emit('close')"
@@ -59,13 +61,13 @@ const sharing = ref(false);
         </div>
         <div class="report-metrics">
           <div>
-            <span>本期收益</span
+            <span>{{ label }}收益</span
             ><strong :class="amountTone(data.summary.periodPnl)">{{
               privateMode ? '••••••' : signedMoney(data.summary.periodPnl)
             }}</strong>
           </div>
           <div>
-            <span>复利收益率</span
+            <span>收益率</span
             ><strong :class="amountTone(data.summary.returnRate ?? '0')">{{
               rateLabel(data.summary.returnRate)
             }}</strong>
@@ -79,7 +81,7 @@ const sharing = ref(false);
           {{ lastEntryLabel(data.summary.lastRecordedDate, data.today) }}
         </div>
         <section class="report-commentary" aria-label="收益简评">
-          <h3><AppIcon name="note-pencil" />本期简评</h3>
+          <h3><AppIcon name="note-pencil" />{{ label }}简评</h3>
           <p v-for="(line, index) in data.commentary" :key="index">{{ line }}</p>
         </section>
         <ReturnChart
@@ -93,7 +95,7 @@ const sharing = ref(false);
             <h3>分类收益</h3>
             <span class="muted">{{ data.categories.length }} 个分类</span>
           </div>
-          <div v-if="!data.categories.length" class="chart-empty">本期暂无分类</div>
+          <div v-if="!data.categories.length" class="chart-empty">{{ label }}暂无分类</div>
           <table v-else>
             <thead>
               <tr>
@@ -132,7 +134,7 @@ const sharing = ref(false);
               ? '报表加载失败，请重试后分享'
               : !data
                 ? '报表尚未加载'
-                : '本期没有录入记录，暂不能分享'
+                : `${label}没有录入记录，暂不能分享`
         "
         @click="sharing = true"
         ><AppIcon name="export" />分享收益</AppButton

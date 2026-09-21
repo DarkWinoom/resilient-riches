@@ -111,9 +111,17 @@ export function createLedgerService(database: AppDatabase, currentDate: () => st
     };
   };
 
-  const readDay = (date: string): EntryDayResponse => {
+  const readDay = (date: string, categoryId?: string): EntryDayResponse => {
     validateEntryDate(date, currentDate());
-    const input = loadLedgerInput(database);
+    const input = categoryId
+      ? {
+          categories: [category(categoryId)],
+          entries: database
+            .prepare('SELECT * FROM daily_entries WHERE category_id=? ORDER BY date')
+            .all(categoryId)
+            .map(entryFromRow),
+        }
+      : loadLedgerInput(database);
     const ledger = calculateLedger({ ...input, from: date, through: date, timeline: 'events' });
     const days = new Map(ledger.categories.map((item) => [item.categoryId, item.days.at(-1)]));
     return {
@@ -156,31 +164,13 @@ export function createLedgerService(database: AppDatabase, currentDate: () => st
           createdAt: '',
           updatedAt: '',
         };
-        if (values.previousCycleId) {
-          const previous = category(values.previousCycleId);
-          if (!previous.archivedOn)
-            throw new ApiError(400, 'NOT_LIQUIDATED', '仅已清仓分类可以重新激活');
-          if (values.openingDate < previous.archivedOn)
-            throw new ApiError(
-              400,
-              'INVALID_REOPEN_DATE',
-              '新持仓启用日期不能早于上一轮清仓日期',
-              'openingDate',
-            );
-          if (
-            database.prepare('SELECT id FROM categories WHERE previous_cycle_id=?').get(previous.id)
-          )
-            throw new ApiError(409, 'ALREADY_REOPENED', '此分类已经重新激活，请编辑新的持仓');
-        }
         validateValues(draft);
-        const next = values.previousCycleId
-          ? category(values.previousCycleId).sortOrder
-          : (database
-              .prepare('SELECT coalesce(max(sort_order), -1) + 1 AS next FROM categories')
-              .get()?.next ?? 0n);
+        const next =
+          database.prepare('SELECT coalesce(max(sort_order), -1) + 1 AS next FROM categories').get()
+            ?.next ?? 0n;
         database
           .prepare(
-            `INSERT INTO categories (id,name,color,opening_date,opening_balance_minor,historical_pnl_minor,note,sort_order,previous_cycle_id)
+            `INSERT INTO categories (id,name,color,opening_date,opening_balance_minor,historical_pnl_minor,note,sort_order,include_in_stats)
           VALUES (?,?,?,?,?,?,?,?,?)`,
           )
           .run(
@@ -192,7 +182,7 @@ export function createLedgerService(database: AppDatabase, currentDate: () => st
             parseMoney(draft.historicalPnl),
             draft.note,
             next,
-            values.previousCycleId ?? null,
+            values.includeInStats === false ? 0 : 1,
           );
         return withBalance(category(id), validateBook());
       });
@@ -201,22 +191,11 @@ export function createLedgerService(database: AppDatabase, currentDate: () => st
       return database.transaction(() => {
         const current = category(id);
         checkRevision(current.revision, patch.revision);
-        if (
-          patch.previousCycleId !== undefined &&
-          patch.previousCycleId !== current.previousCycleId
-        )
-          throw new ApiError(400, 'IMMUTABLE_CYCLE', '不能修改持仓轮次关联');
         const draft = { ...current, ...patch, name: (patch.name ?? current.name).trim() };
-        if (
-          current.archivedOn &&
-          patch.archivedOn === null &&
-          database.prepare('SELECT id FROM categories WHERE previous_cycle_id=?').get(id)
-        )
-          throw new ApiError(409, 'ALREADY_REOPENED', '该轮持仓已有新的持仓，不能恢复旧轮次');
         validateValues(draft);
         database
           .prepare(
-            `UPDATE categories SET name=?,color=?,opening_date=?,opening_balance_minor=?,historical_pnl_minor=?,note=?,archived_on=?,revision=revision+1,${stamp} WHERE id=?`,
+            `UPDATE categories SET name=?,color=?,opening_date=?,opening_balance_minor=?,historical_pnl_minor=?,note=?,include_in_stats=?,revision=revision+1,${stamp} WHERE id=?`,
           )
           .run(
             draft.name,
@@ -225,39 +204,9 @@ export function createLedgerService(database: AppDatabase, currentDate: () => st
             parseMoney(draft.openingBalance),
             parseMoney(draft.historicalPnl),
             draft.note,
-            draft.archivedOn,
+            draft.includeInStats === false ? 0 : 1,
             id,
           );
-        return withBalance(category(id), validateBook());
-      });
-    },
-    liquidate(id: string, revision: number, pnl: string) {
-      return database.transaction(() => {
-        const current = category(id);
-        checkRevision(current.revision, revision);
-        if (current.archivedOn) throw new ApiError(409, 'ALREADY_LIQUIDATED', '分类已经清仓');
-        const date = currentDate();
-        const item = readDay(date).items.find((item) => item.category.id === id)!;
-        const existing = item.entry;
-        const amount = parseMoney(pnl, 'liquidationPnl');
-        if (existing?.liquidationPnl != null)
-          throw new ApiError(409, 'ALREADY_LIQUIDATED', '当天已有清仓记录，请从记录日历修改');
-        if (existing) {
-          database
-            .prepare(
-              `UPDATE daily_entries SET liquidation_pnl_minor=?,revision=revision+1,${stamp} WHERE id=?`,
-            )
-            .run(amount, existing.id);
-        } else {
-          database
-            .prepare(
-              'INSERT INTO daily_entries (id,category_id,date,closing_balance_minor,buy_minor,sell_minor,note,liquidation_pnl_minor) VALUES (?,?,?,?,0,0,?,?)',
-            )
-            .run(randomUUID(), id, date, parseMoney(item.openingBalance), '', amount);
-        }
-        database
-          .prepare(`UPDATE categories SET archived_on=?,revision=revision+1,${stamp} WHERE id=?`)
-          .run(date, id);
         return withBalance(category(id), validateBook());
       });
     },
@@ -335,7 +284,7 @@ export function createLedgerService(database: AppDatabase, currentDate: () => st
             throw new ApiError(
               400,
               'LIQUIDATION_MODE',
-              '请通过分类清仓操作创建清仓记录；已有清仓记录需保留清仓盈亏',
+              '该字段仅用于兼容旧版结算记录，已有结算记录需保留最终盈亏',
             );
           if (existing) {
             database
@@ -384,14 +333,21 @@ export function createLedgerService(database: AppDatabase, currentDate: () => st
         return readDay(entry.date);
       });
     },
-    calendar(month: string): CalendarResponse {
+    calendar(month: string, categoryId?: string): CalendarResponse {
       parseDate(`${month}-01`, 'month');
       validateEntryDate(`${month}-01`, currentDate());
-      const rows = database
-        .prepare(
-          'SELECT e.date,count(*) AS count,(SELECT count(*) FROM categories c WHERE c.opening_date<=e.date AND (c.archived_on IS NULL OR c.archived_on>=e.date) AND NOT EXISTS (SELECT 1 FROM categories n WHERE n.previous_cycle_id=c.id)) AS total FROM daily_entries e WHERE substr(e.date,1,7)=? AND NOT EXISTS (SELECT 1 FROM categories n WHERE n.previous_cycle_id=e.category_id) GROUP BY e.date ORDER BY e.date',
-        )
-        .all(month);
+      if (categoryId) category(categoryId);
+      const rows = categoryId
+        ? database
+            .prepare(
+              'SELECT date, count(*) AS count, 1 AS total FROM daily_entries WHERE category_id=? AND substr(date,1,7)=? GROUP BY date ORDER BY date',
+            )
+            .all(categoryId, month)
+        : database
+            .prepare(
+              'SELECT e.date,count(*) AS count,(SELECT count(*) FROM categories c WHERE c.opening_date<=e.date AND (c.archived_on IS NULL OR c.archived_on>=e.date) AND NOT EXISTS (SELECT 1 FROM categories n WHERE n.previous_cycle_id=c.id)) AS total FROM daily_entries e WHERE substr(e.date,1,7)=? AND NOT EXISTS (SELECT 1 FROM categories n WHERE n.previous_cycle_id=e.category_id) GROUP BY e.date ORDER BY e.date',
+            )
+            .all(month);
       return {
         month,
         today: currentDate(),

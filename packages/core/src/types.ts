@@ -1,4 +1,5 @@
 export interface Category {
+  includeInStats?: boolean;
   id: string;
   name: string;
   color: string;
@@ -42,6 +43,7 @@ export interface ReturnSegment {
 }
 
 export interface PerformanceSummary {
+  historicalRateIncluded?: boolean;
   closingBalance: string;
   periodPnl: string;
   cumulativePnl: string;
@@ -60,6 +62,9 @@ export interface LedgerSeries {
 }
 
 export interface CurvePoint {
+  historicalRateIncluded?: boolean;
+  buy?: string;
+  sell?: string;
   date: string;
   pnl: string;
   cumulativePnl: string;

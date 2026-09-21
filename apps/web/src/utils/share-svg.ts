@@ -1,4 +1,5 @@
 import type { ShareModel } from './share-model.ts';
+import { periodLabel } from '@resilient-riches/core';
 import { reportTitles } from './share-model.ts';
 import { rateLabel, signedMoney } from './format.ts';
 
@@ -57,16 +58,24 @@ export function renderShareSvg(model: ShareModel): { svg: string; width: number;
   parts.push(`<rect x="70" y="200" width="760" height="144" rx="14" fill="#f7f5ef"/>`);
   if (model.amounts) {
     parts.push(
-      text(94, 241, showCurve ? '本期收益' : '当日收益', 23, '#827a6e'),
+      text(
+        94,
+        241,
+        showCurve ? periodLabel(model.period, model.current) + '收益' : '当日收益',
+        23,
+        '#827a6e',
+      ),
       text(94, 294, signedMoney(model.amounts.pnl), 38, tone(model.amounts.pnl), 'start', 600),
-      text(465, 241, showCurve ? '复利收益率' : '当日收益率', 23, '#827a6e'),
+      text(465, 241, showCurve ? '收益率' : '当日收益率', 23, '#827a6e'),
       text(465, 294, rateLabel(model.returnRate), 38, tone(model.returnRate), 'start', 600),
     );
   } else
     parts.push(
-      text(450, 241, showCurve ? '本期复利收益率' : '当日收益率', 24, '#827a6e', 'middle'),
+      text(450, 241, showCurve ? '收益率' : '当日收益率', 24, '#827a6e', 'middle'),
       text(450, 300, rateLabel(model.returnRate), 48, tone(model.returnRate), 'middle', 600),
     );
+  if (model.historicalRateIncluded === false)
+    parts.push(text(72, 375, '收益率不含无法还原本金的历史部分', 18, '#827a6e'));
   if (showCurve) {
     const values = model.curve.map((point) =>
       point.returnRate === null ? null : Number(point.returnRate) * 100,
@@ -105,7 +114,13 @@ export function renderShareSvg(model: ShareModel): { svg: string; width: number;
       );
     } else parts.push(text(475, top + 137, '暂无可计算的收益率', 26, '#827a6e', 'middle'));
     parts.push(
-      text(156, top + chartHeight + 3, model.range.from.slice(5).replace('-', '.'), 22, '#827a6e'),
+      text(
+        156,
+        top + chartHeight + 3,
+        (model.curve[0]?.date ?? model.range.from).slice(5).replace('-', '.'),
+        22,
+        '#827a6e',
+      ),
       text(
         806,
         top + chartHeight + 3,

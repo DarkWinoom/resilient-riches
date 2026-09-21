@@ -71,9 +71,9 @@ describe('period calendar and disabled explanations', () => {
     expect(wrapper.emitted('select')?.[1]).toEqual(['2025-01-01']);
   });
   it('explains the missing category and loading states while keeping the action disabled', async () => {
-    wrapper = mount(AppHeader, { props: { disabled: false, hasCategories: false } });
+    wrapper = mount(AppHeader, { props: { disabled: false, categories: [] } });
     const record = wrapper.findAll('button').find((item) => item.text() === '记录盈亏')!;
-    expect(record.attributes('data-disabled-reason')).toBe('请先在分类持仓中新增分类');
+    expect(record.attributes('data-disabled-reason')).toBe('请先新增分类');
     expect(record.attributes('aria-description')).toContain('新增分类');
     await record.trigger('click');
     expect(wrapper.emitted('record')).toBeUndefined();

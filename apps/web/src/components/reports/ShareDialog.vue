@@ -80,7 +80,9 @@ const { exporting, error, success, save } = useReportExport();
         variant="primary"
         :disabled="!report.recordCount"
         :loading="exporting"
-        :disabled-reason="exporting ? '正在生成图片，请稍候' : '本期没有录入记录，暂不能保存分享图'"
+        :disabled-reason="
+          exporting ? '正在生成图片，请稍候' : '所选期间没有录入记录，暂不能保存分享图'
+        "
         @click="save(model)"
         ><AppIcon name="download-simple" />保存 PNG</AppButton
       >

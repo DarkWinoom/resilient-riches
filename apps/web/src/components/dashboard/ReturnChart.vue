@@ -7,7 +7,7 @@ const props = defineProps<{
   privateMode: boolean;
   loading: boolean;
 }>();
-const mode = ref<'rate' | 'amount'>('rate');
+const mode = ref<'rate' | 'assets'>('rate');
 const shownMode = computed(() => (props.privateMode ? 'rate' : mode.value));
 const plot = useTemplateRef<HTMLDivElement>('plot');
 const width = ref(800),
@@ -38,7 +38,7 @@ const values = computed(() =>
       ? point.returnRate === null
         ? null
         : Number(point.returnRate) * 100
-      : Number(point.cumulativePnl),
+      : Number(point.closingBalance),
   ),
 );
 const samples = values;
@@ -47,6 +47,12 @@ const flat = computed(() => values.value.every((value) => value === null || valu
 const lastValue = computed(() => values.value.at(-1) ?? null);
 const bounds = computed(() => {
   const finite = samples.value.filter((value): value is number => value !== null);
+  if (shownMode.value === 'assets' && finite.length) {
+    const low = Math.min(...finite),
+      high = Math.max(...finite);
+    const padding = (high - low || high * 0.05 || 1) * 0.13;
+    return { low: Math.max(0, low - padding), high: high + padding };
+  }
   let low = Math.min(0, ...finite),
     high = Math.max(0, ...finite);
   const padding = (high - low || 1) * 0.13;
@@ -140,23 +146,29 @@ const dateLabels = computed(() => {
 <template>
   <section class="return-panel chart-panel" :aria-busy="loading">
     <header class="chart-heading">
-      <h2>收益曲线</h2>
+      <h2>资产走势</h2>
       <div class="chart-modes" role="group" aria-label="曲线指标">
         <button :aria-pressed="shownMode === 'rate'" @click="mode = 'rate'">收益率</button
         ><button
           v-if="!privateMode"
-          :aria-pressed="shownMode === 'amount'"
-          @click="mode = 'amount'"
+          :aria-pressed="shownMode === 'assets'"
+          @click="mode = 'assets'"
         >
-          收益金额
+          资产轨迹
         </button>
       </div>
     </header>
+    <p
+      v-if="shownMode === 'rate' && points.some((point) => point.historicalRateIncluded === false)"
+      class="chart-scope"
+    >
+      历史本金无法还原的部分未计入收益率，盈亏金额完整保留。
+    </p>
     <div
       ref="plot"
       class="return-plot"
       :tabindex="available ? 0 : -1"
-      :aria-label="`累计${shownMode === 'rate' ? '收益率' : '收益金额'}曲线，${available ? '使用左右方向键查看日期' : '暂无可展示数据'}`"
+      :aria-label="`${shownMode === 'rate' ? '累计收益率' : '每日总资产'}曲线，${available ? '使用左右方向键查看日期' : '暂无可展示数据'}`"
       @pointermove="pointAt"
       @pointerleave="active = null"
       @keydown="key"
@@ -178,10 +190,18 @@ const dateLabels = computed(() => {
           <line x1="66" :x2="width - 22" :y1="y(value)" :y2="y(value)" class="chart-gridline" />
           <text x="56" :y="y(value) + 5" text-anchor="end">{{ tick(value) }}</text>
         </g>
-        <line x1="66" :x2="width - 22" :y1="y(0)" :y2="y(0)" class="chart-zero" />
+        <line
+          v-if="shownMode === 'rate'"
+          x1="66"
+          :x2="width - 22"
+          :y1="y(0)"
+          :y2="y(0)"
+          class="chart-zero"
+        />
         <g :key="`${shownMode}-${points[0]?.date}-${points.length}`" class="chart-lines">
           <template v-for="(path, index) in paths" :key="index">
-            <path v-if="flat" :d="path" class="chart-line chart-line--flat" />
+            <path v-if="shownMode === 'assets'" :d="path" class="chart-line chart-line--assets" />
+            <path v-else-if="flat" :d="path" class="chart-line chart-line--flat" />
             <path
               v-else
               :d="path"
@@ -189,7 +209,7 @@ const dateLabels = computed(() => {
               :clip-path="`url(#${clip}-up)`"
             />
             <path
-              v-if="!flat"
+              v-if="!flat && shownMode === 'rate'"
               :d="path"
               class="chart-line chart-line--down"
               :clip-path="`url(#${clip}-down)`"
@@ -226,7 +246,7 @@ const dateLabels = computed(() => {
         </template>
       </svg>
       <div v-else class="chart-empty">
-        {{ shownMode === 'rate' ? '暂无可计算的收益率' : '暂无收益数据' }}
+        {{ shownMode === 'rate' ? '暂无可计算的收益率' : '暂无资产数据' }}
       </div>
       <div
         v-if="tooltip"
@@ -235,29 +255,41 @@ const dateLabels = computed(() => {
         :style="{ left: `${Math.max(0, Math.min(width - 220, x(active ?? 0) - 100))}px` }"
       >
         <strong>{{ tooltip.date }}</strong
-        ><span
-          >累计收益率
-          <b :class="amountTone(tooltip.returnRate ?? '0')">{{
-            rateLabel(tooltip.returnRate)
-          }}</b></span
-        ><template v-if="!privateMode"
+        ><template v-if="shownMode === 'assets'">
+          <span
+            >当日转入 <b>{{ moneyLabel(tooltip.buy ?? '0') }}</b></span
+          >
+          <span
+            >当日转出 <b>{{ moneyLabel(tooltip.sell ?? '0') }}</b></span
+          >
+          <span
+            >收益金额 <b :class="amountTone(tooltip.pnl)">{{ signedMoney(tooltip.pnl) }}</b></span
+          > </template
+        ><template v-else
           ><span
-            >本期累计收益
-            <b :class="amountTone(tooltip.cumulativePnl)">{{
-              signedMoney(tooltip.cumulativePnl)
+            >累计收益率
+            <b :class="amountTone(tooltip.returnRate ?? '0')">{{
+              rateLabel(tooltip.returnRate)
             }}</b></span
-          ><span
-            >当日收益 <b :class="amountTone(tooltip.pnl)">{{ signedMoney(tooltip.pnl) }}</b></span
-          ><span
-            >当日余额 <b>{{ moneyLabel(tooltip.closingBalance) }}</b></span
-          ></template
-        ><span v-if="tooltip.rateReason && tooltip.rateReason !== 'no_capital'" class="muted">{{
-          tooltip.rateReason === 'capital_reset'
-            ? '本金归零后重启，无法连续复利'
-            : tooltip.rateReason === 'invalid_historical_capital'
-              ? '历史本金无效，无法计算收益率'
-              : '存在零本金收益，无法连续复利'
-        }}</span>
+          ><template v-if="!privateMode"
+            ><span
+              >累计收益金额
+              <b :class="amountTone(tooltip.cumulativePnl)">{{
+                signedMoney(tooltip.cumulativePnl)
+              }}</b></span
+            ><span
+              >当日收益 <b :class="amountTone(tooltip.pnl)">{{ signedMoney(tooltip.pnl) }}</b></span
+            ><span
+              >当日余额 <b>{{ moneyLabel(tooltip.closingBalance) }}</b></span
+            ></template
+          ><span v-if="tooltip.rateReason && tooltip.rateReason !== 'no_capital'" class="muted">{{
+            tooltip.rateReason === 'capital_reset'
+              ? '本金归零后重启，无法连续复利'
+              : tooltip.rateReason === 'invalid_historical_capital'
+                ? '历史本金无效，无法计算收益率'
+                : '存在零本金收益，无法连续复利'
+          }}</span></template
+        >
       </div>
     </div>
   </section>

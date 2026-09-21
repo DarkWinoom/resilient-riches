@@ -1,8 +1,12 @@
 <script setup lang="ts">
+import type { CategoryView } from '@resilient-riches/core';
+import RecordMenu from './RecordMenu.vue';
 import AppButton from '../ui/AppButton.vue';
 import AppIcon from '../ui/AppIcon.vue';
-defineProps<{ disabled: boolean; hasCategories: boolean }>();
-defineEmits<{ record: []; report: [] }>();
+withDefaults(defineProps<{ disabled: boolean; categories?: readonly CategoryView[] }>(), {
+  categories: () => [],
+});
+defineEmits<{ record: [id?: string]; report: []; create: [] }>();
 </script>
 <template>
   <header class="topbar">
@@ -19,13 +23,14 @@ defineEmits<{ record: []; report: [] }>();
           disabled-reason="账本暂未就绪，请稍候或重试"
           @click="$emit('report')"
           ><AppIcon name="chart-bar" />收益报表</AppButton
-        ><AppButton
-          variant="primary"
-          :disabled="disabled || !hasCategories"
-          :disabled-reason="disabled ? '账本暂未就绪，请稍候或重试' : '请先在分类持仓中新增分类'"
-          @click="$emit('record')"
-          ><AppIcon name="plus" />记录盈亏</AppButton
+        ><AppButton class="category-create" :disabled="disabled" @click="$emit('create')"
+          ><AppIcon name="folder-plus" />新增分类</AppButton
         >
+        <RecordMenu
+          :categories="categories"
+          :disabled="disabled"
+          @record="$emit('record', $event)"
+        />
       </nav>
     </div>
   </header>

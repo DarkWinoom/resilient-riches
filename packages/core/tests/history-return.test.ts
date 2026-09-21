@@ -34,9 +34,10 @@ describe('historical return baseline', () => {
     expect(
       result([{ ...category, openingBalance: '150000', historicalPnl: '50000' }]).returnRate,
     ).toBe('0.5');
-    expect(result([{ ...category, historicalPnl: '500000' }]).rateReason).toBe(
-      'invalid_historical_capital',
-    );
+    expect(result([{ ...category, historicalPnl: '500000' }])).toMatchObject({
+      returnRate: '0',
+      historicalRateIncluded: false,
+    });
     expect(result([{ ...category, openingBalance: '0' }]).returnRate).toBe('-1');
     expect(result([{ ...category, openingBalance: '0' }], '1000', '1000').rateReason).toBe(
       'capital_reset',

@@ -82,12 +82,6 @@ export const api = {
   createCategory: (values: CategoryValues) => request<CategoryView>('/categories', 'POST', values),
   updateCategory: (id: string, values: CategoryPatch) =>
     request<CategoryView>(`/categories/${encodeURIComponent(id)}`, 'PATCH', values),
-  liquidate: (id: string, revision: number, pnl: string) =>
-    request<CategoryView>(`/categories/${encodeURIComponent(id)}/liquidate`, 'POST', {
-      revision,
-      pnl,
-      confirm: true,
-    }),
   reorder: (items: { id: string; revision: number }[]) =>
     request<CategoryListResponse>('/categories/order', 'PUT', { items }),
   deletionImpact: (id: string) =>
@@ -97,16 +91,20 @@ export const api = {
       revision,
       confirm: true,
     }),
-  day: (date: string, signal?: AbortSignal) =>
+  day: (date: string, signal?: AbortSignal, categoryId?: string) =>
     request<EntryDayResponse>(
-      `/entries?date=${encodeURIComponent(date)}`,
+      '/entries?date=' +
+        encodeURIComponent(date) +
+        (categoryId ? '&categoryId=' + encodeURIComponent(categoryId) : ''),
       'GET',
       undefined,
       signal,
     ),
-  calendar: (month: string, signal?: AbortSignal) =>
+  calendar: (month: string, signal?: AbortSignal, categoryId?: string) =>
     request<CalendarResponse>(
-      `/calendar?month=${encodeURIComponent(month)}`,
+      '/calendar?month=' +
+        encodeURIComponent(month) +
+        (categoryId ? '&categoryId=' + encodeURIComponent(categoryId) : ''),
       'GET',
       undefined,
       signal,

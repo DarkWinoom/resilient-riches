@@ -113,4 +113,12 @@ export const migrations: readonly Migration[] = [
       BEGIN SELECT RAISE(ABORT, 'Entry outside category lifetime'); END;
     `,
   },
+  {
+    version: 3,
+    name: 'category-statistics',
+    sql: `
+    ALTER TABLE categories ADD COLUMN include_in_stats INTEGER NOT NULL DEFAULT 1 CHECK(include_in_stats IN (0,1));
+    UPDATE categories SET archived_on=NULL, revision=revision+1 WHERE archived_on IS NOT NULL AND NOT EXISTS (SELECT 1 FROM categories n WHERE n.previous_cycle_id=categories.id);
+  `,
+  },
 ];

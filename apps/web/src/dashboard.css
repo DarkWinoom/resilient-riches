@@ -824,29 +824,6 @@
   flex-wrap: wrap;
   justify-content: space-between;
 }
-.detail-daily table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 14px;
-}
-.detail-daily th,
-.detail-daily td {
-  padding: 14px 8px;
-  border-bottom: 1px solid var(--line);
-}
-.detail-daily th {
-  text-align: left;
-  color: var(--muted);
-  font-weight: 500;
-}
-.detail-daily .numeric {
-  text-align: right;
-}
-.daily-source {
-  display: block;
-  margin-top: 5px;
-  font-size: 14px;
-}
 @media (max-width: 700px) {
   .dashboard-table td.drag-cell {
     position: absolute;
@@ -862,4 +839,104 @@
     padding-left: 24px;
     padding-right: 100px;
   }
+}
+
+.category-create {
+  background: #e4ece5;
+  color: #47614c;
+  border-color: #d2dfd4;
+}
+.category-create:hover:not(:disabled) {
+  background: #d7e4da;
+  border-color: #b9cdbd;
+}
+.record-menu {
+  position: relative;
+}
+.record-dropdown {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  padding: 8px;
+  min-width: 220px;
+  max-width: 300px;
+  max-height: 360px;
+  overflow: auto;
+  z-index: 20;
+  background: #fffdf8;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px #302d2720;
+}
+.record-dropdown button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 11px 12px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font-size: 14px;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.record-dropdown button:hover,
+.record-dropdown button:focus-visible {
+  background: #f3eddf;
+}
+.holding-rate {
+  display: block;
+  font-size: 14px;
+  margin-top: 6px;
+}
+.holding-excluded td,
+.holding-excluded .profit,
+.holding-excluded .loss,
+.holding-excluded .muted,
+.holding-excluded .holding-name,
+.holding-excluded .table-action {
+  color: #a9a59c;
+}
+.holding-excluded .holding-icon {
+  opacity: 0.45;
+}
+.chart-line--assets {
+  stroke: var(--gold);
+}
+.statistics-option {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.check-control {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 10px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 16px;
+  padding: 5px 0;
+}
+.check-box {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid #c9bea8;
+  border-radius: 5px;
+  color: white;
+}
+.check-control[aria-checked='true'] .check-box {
+  background: var(--gold);
+  border-color: var(--gold);
+}
+
+.chart-scope {
+  color: var(--muted);
+  font-size: 14px;
+  padding: 0 22px 6px;
 }

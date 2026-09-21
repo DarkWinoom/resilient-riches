@@ -1,32 +1,48 @@
-import { FinancialDecimal } from '@resilient-riches/core';
+import { FinancialDecimal, includeHistoricalReturn, periodLabel } from '@resilient-riches/core';
 import type { Period, ReportResponse } from '@resilient-riches/core';
 import type { AppDatabase } from '../database/database.ts';
 import { loadLedgerInput } from '../database/ledger-input.ts';
-import { createDashboardService } from './dashboard-service.ts';
+import { performance, statisticsInput } from './performance.ts';
 
 export function createReportService(database: AppDatabase, clock: () => string) {
-  const dashboard = createDashboardService(database, clock);
   return function report(period: Period, anchor: string): ReportResponse {
-    const data = dashboard.dashboard(period, anchor);
-    const entries = loadLedgerInput(database).entries.filter(
-      (entry) => entry.date <= data.range.to,
+    const today = clock();
+    const input = statisticsInput(loadLedgerInput(database));
+    const selected = performance(input, today, period, anchor);
+    const data = {
+      today,
+      range: selected.range,
+      performance: selected.summary,
+      curve: selected.curve,
+      categories: input.categories,
+    };
+    const summaries = new Map(
+      selected.ledger.categories.map((item) => [item.categoryId, item.summary]),
     );
+    const label = periodLabel(period, data.range.to === today);
+    const entries = input.entries.filter((entry) => entry.date <= data.range.to);
     const categories = data.categories
       .filter(
         (category) =>
           category.openingDate <= data.range.to &&
           (!category.archivedOn || category.archivedOn >= data.range.from),
       )
-      .map((category) => ({
-        id: category.id,
-        name: category.name,
-        color: category.color,
-        pnl: category.periodPnl,
-        endingBalance: category.periodClosingBalance,
-        returnRate: category.returnRate,
-        lastRecordedDate:
-          entries.filter((entry) => entry.categoryId === category.id).at(-1)?.date ?? null,
-      }));
+      .map((category) => {
+        const summary = summaries.get(category.id)!;
+        return {
+          id: category.id,
+          name: category.name,
+          color: category.color,
+          pnl: period === 'all' ? summary.cumulativePnl : summary.periodPnl,
+          endingBalance: summary.closingBalance,
+          returnRate:
+            period === 'all'
+              ? includeHistoricalReturn(summary, [category]).returnRate
+              : summary.returnRate,
+          lastRecordedDate:
+            entries.filter((entry) => entry.categoryId === category.id).at(-1)?.date ?? null,
+        };
+      });
     const recordCount = entries.filter((entry) => entry.date >= data.range.from).length;
     const winners = categories
       .filter((category) => new FinancialDecimal(category.pnl).gt(0))
@@ -36,20 +52,22 @@ export function createReportService(database: AppDatabase, clock: () => string) 
       .sort((a, b) => new FinancialDecimal(a.pnl).cmp(b.pnl));
     const pnl = new FinancialDecimal(data.performance.periodPnl);
     const commentary: string[] = [];
-    if (!categories.length) commentary.push('本期尚无启用的分类。');
-    else if (!recordCount) commentary.push('本期没有录入记录，收益按零变动展示。');
+    if (!categories.length) commentary.push(label + '尚无启用的分类。');
+    else if (!recordCount) commentary.push(label + '没有录入记录。');
     else
       commentary.push(
-        `本期${pnl.isZero() ? '盈亏持平' : pnl.gt(0) ? '取得正收益' : '出现亏损'}，${winners.length} 个分类盈利，${losers.length} 个分类亏损。`,
+        `${label}${pnl.isZero() ? '盈亏持平' : pnl.gt(0) ? '取得正收益' : '出现亏损'}，${winners.length} 个分类盈利，${losers.length} 个分类亏损。`,
       );
+    if (data.performance.historicalRateIncluded === false)
+      commentary.push('历史本金无法还原的部分未计入收益率，盈亏金额完整保留。');
     if (data.performance.returnRate !== null)
       commentary.push(
-        `组合复利收益率为 ${new FinancialDecimal(data.performance.returnRate).mul(100).toFixed(2)}%。`,
+        `组合收益率为 ${new FinancialDecimal(data.performance.returnRate).mul(100).toFixed(2)}%。`,
       );
     else if (data.performance.rateReason === 'capital_reset')
-      commentary.push('本期本金归零后重新投入，收益金额仍可汇总，连续复利收益率不适用。');
+      commentary.push(label + '本金归零后重新投入，收益金额仍可汇总，连续收益率不适用。');
     else if (data.performance.rateReason === 'zero_capital_gain')
-      commentary.push('本期存在零本金收益，无法计算连续复利收益率。');
+      commentary.push(label + '存在零本金收益，无法计算连续收益率。');
     if (winners[0]) {
       const positive = winners.reduce(
         (sum, category) => sum.plus(category.pnl),
@@ -58,7 +76,7 @@ export function createReportService(database: AppDatabase, clock: () => string) 
       const share = new FinancialDecimal(winners[0].pnl).div(positive).mul(100).toFixed(1);
       commentary.push(`“${winners[0].name}”贡献最多，占盈利分类收益合计的 ${share}%。`);
     }
-    if (losers[0]) commentary.push(`“${losers[0].name}”是本期主要亏损来源。`);
+    if (losers[0]) commentary.push(`“${losers[0].name}”是${label}主要亏损来源。`);
     return {
       today: data.today,
       period,

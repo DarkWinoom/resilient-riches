@@ -23,23 +23,18 @@ const drawer = ref(false),
   initialId = ref<string | null>(null),
   detailId = ref<string | null>(null),
   entryDate = ref(''),
-  hideClosed = ref(false),
   privateMode = ref(false);
-const visible = computed(() => items.value.filter((item) => !hideClosed.value || !item.archivedOn));
-const label = computed(() => {
-  const current = data.value?.range.to === today.value;
-  return (
-    current
-      ? { day: '当日', week: '本周', month: '本月', year: '本年' }
-      : { day: '当日', week: '当周', month: '当月', year: '当年' }
-  )[data.value?.period ?? 'month'];
-});
+const singleCategory = ref(false);
+const statisticalItems = computed(() =>
+  items.value.filter((item) => item.includeInStats !== false),
+);
 function manage(id: string | null = null) {
   detailId.value = null;
   initialId.value = id;
   drawer.value = true;
 }
-async function record(id: string | null = null, date?: string) {
+async function record(id: string | null = null, date?: string, single = false) {
+  singleCategory.value = single;
   if (openingRecord.value) return;
   openingRecord.value = true;
   try {
@@ -57,8 +52,9 @@ async function record(id: string | null = null, date?: string) {
 <template>
   <AppHeader
     :disabled="!data || openingRecord || sorting"
-    :has-categories="items.some((item) => !item.archivedOn)"
-    @record="record()"
+    :categories="items"
+    @record="record($event ?? null, undefined, !!$event)"
+    @create="manage()"
     @report="reportOpen = true"
   />
   <main class="workspace dashboard-workspace">
@@ -112,30 +108,19 @@ async function record(id: string | null = null, date?: string) {
             :points="data.curve"
             :private-mode="privateMode"
             :loading="loading"
-          /><AllocationBars :categories="items" :private-mode="privateMode" />
+          /><AllocationBars :categories="statisticalItems" :private-mode="privateMode" />
         </div>
       </section>
       <section class="holdings-panel" :aria-busy="loading">
         <header class="panel-heading">
           <h2>
-            分类持仓 <span class="count">{{ visible.length }}</span>
+            分类持仓 <span class="count">{{ items.length }}</span>
           </h2>
-          <div class="panel-actions">
-            <button
-              class="switch-control"
-              role="switch"
-              :aria-checked="hideClosed"
-              @click="hideClosed = !hideClosed"
-            >
-              <span class="switch-track"></span>隐藏已清仓</button
-            ><AppButton variant="quiet" @click="manage()">新增分类</AppButton>
-          </div>
         </header>
         <CategoryTable
-          v-if="visible.length"
-          :items="visible"
+          v-if="items.length"
+          :items="items"
           :today="today"
-          :period-label="label"
           :private-mode="privateMode"
           :disabled="sorting || loading"
           @view="detailId = $event"
@@ -143,7 +128,7 @@ async function record(id: string | null = null, date?: string) {
           @edit="manage"
         />
         <div v-else class="empty-state">
-          <h3>{{ items.length ? '暂无使用中的分类' : '从一个分类开始记账' }}</h3>
+          <h3>从一个分类开始记账</h3>
           <AppButton variant="primary" @click="manage()"><AppIcon name="plus" />新增分类</AppButton>
         </div>
       </section></template
@@ -169,6 +154,7 @@ async function record(id: string | null = null, date?: string) {
     :today="today"
     :initial-id="initialId"
     :initial-date="entryDate"
+    :single-category="singleCategory"
     @close="entry = false"
     @changed="load()"
   /><CategoryDetail

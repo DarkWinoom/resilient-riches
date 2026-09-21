@@ -27,7 +27,14 @@ export function includeHistoricalReturn(
   categories: readonly Category[],
 ): PerformanceSummary {
   const opening = sumMoney(categories.map((category) => parseMoney(category.openingBalance)));
-  const history = sumMoney(categories.map((category) => parseMoney(category.historicalPnl)));
+  const supported = categories.filter(
+    (category) =>
+      parseMoney(category.historicalPnl) <= 0n ||
+      parseMoney(category.openingBalance) > parseMoney(category.historicalPnl),
+  );
+  if (supported.length !== categories.length)
+    summary = { ...summary, historicalRateIncluded: false };
+  const history = sumMoney(supported.map((category) => parseMoney(category.historicalPnl)));
   if (history === 0n) return summary;
   const capital = opening - history;
   if (capital <= 0n)
@@ -49,6 +56,7 @@ export function includeHistoricalReturn(
 }
 
 interface InternalDay {
+  historicalRateIncluded?: boolean;
   date: string;
   opening: bigint;
   buy: bigint;
@@ -217,6 +225,7 @@ function series(
   const cumulative = checkTotal(sumMoney(points.map((point) => point.pnl)) + historical);
   const curve: CurvePoint[] = [];
   let running = 0n;
+  const actualDays = includeCurve ? new Map(points.map((point) => [point.date, point])) : null;
   const performance = compound(selected);
   if (includeCurve)
     compound(
@@ -226,7 +235,10 @@ function series(
             running = checkTotal(running + point.pnl);
             curve.push({
               date: point.date,
-              pnl: formatMoney(point.pnl),
+              buy: formatMoney(point.buy),
+              sell: formatMoney(point.sell),
+              pnl: formatMoney(actualDays!.get(point.date)!.pnl),
+              ...(point.historicalRateIncluded === false ? { historicalRateIncluded: false } : {}),
               cumulativePnl: formatMoney(running),
               closingBalance: formatMoney(point.closing),
               ...rate,
@@ -306,6 +318,7 @@ export function calculateLedger(input: {
     input.from ?? (earliest !== undefined && earliest <= input.through ? earliest : input.through);
   const portfolio: InternalDay[] = [];
   const historicalCurve: InternalDay[] = [];
+  let historicalRateIncluded = true;
   let lastRecordedDate: string | null = null;
   const events = [
     ...new Set([
@@ -330,6 +343,7 @@ export function calculateLedger(input: {
     const sells: bigint[] = [];
     let liquidated = 0n;
     let openingHistory = 0n;
+    let rateHistory = 0n;
     let hasRecord = false;
     let hasOpening = false;
     for (const state of states) {
@@ -378,6 +392,9 @@ export function calculateLedger(input: {
       if (isOpening) {
         hasOpening = true;
         openingHistory += state.historical;
+        if (state.historical > 0n && state.opening <= state.historical)
+          historicalRateIncluded = false;
+        else rateHistory += state.historical;
       }
       state.points.push({
         date,
@@ -408,21 +425,24 @@ export function calculateLedger(input: {
       source: hasRecord ? 'recorded' : hasOpening ? 'opening' : 'carried',
       lastRecordedDate,
     });
-    const point = portfolio.at(-1)!;
-    const historicalCapital = opening + buy - (sell - liquidated) - openingHistory;
-    const historicalProfit = point.pnl + openingHistory;
-    historicalCurve.push({
-      ...point,
-      pnl: historicalProfit,
-      rate:
-        historicalCapital > 0n
-          ? new FinancialDecimal(historicalProfit.toString()).div(historicalCapital.toString())
-          : null,
-      reason:
-        historicalCapital <= 0n && openingHistory !== 0n
-          ? 'invalid_historical_capital'
-          : point.reason,
-    });
+    if (input.includeCurve && input.includeOpeningHistory) {
+      const point = portfolio.at(-1)!;
+      const historicalCapital = opening + buy - (sell - liquidated) - rateHistory;
+      const historicalProfit = point.pnl + rateHistory;
+      historicalCurve.push({
+        ...point,
+        pnl: point.pnl + openingHistory,
+        ...(historicalRateIncluded ? {} : { historicalRateIncluded: false }),
+        rate:
+          historicalCapital > 0n
+            ? new FinancialDecimal(historicalProfit.toString()).div(historicalCapital.toString())
+            : null,
+        reason:
+          historicalCapital <= 0n && rateHistory !== 0n
+            ? 'invalid_historical_capital'
+            : point.reason,
+      });
+    }
   }
   return {
     from,

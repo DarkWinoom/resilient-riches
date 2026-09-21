@@ -7,7 +7,6 @@ import AppIcon from '../ui/AppIcon.vue';
 import BaseOverlay from '../ui/BaseOverlay.vue';
 import PeriodCalendar from './PeriodCalendar.vue';
 const props = defineProps<{
-  reverse?: boolean;
   period: Period;
   anchor: string;
   today: string;
@@ -17,14 +16,15 @@ const props = defineProps<{
 const emit = defineEmits<{ change: [period: Period, anchor: string] }>();
 const choosing = ref(false);
 const options: { id: Period; label: string }[] = [
-  { id: 'day', label: '日' },
   { id: 'week', label: '周' },
   { id: 'month', label: '月' },
   { id: 'year', label: '年' },
+  { id: 'all', label: '总' },
 ];
-const labels = computed(() => (props.reverse ? [...options].reverse() : options));
-const index = computed(() => labels.value.findIndex((item) => item.id === props.period));
+const labels = options;
+const index = computed(() => labels.findIndex((item) => item.id === props.period));
 function adjacent(delta: number) {
+  if (props.period === 'all') return null;
   const range = periodRange(props.period, props.anchor, props.today);
   if (delta < 0) {
     try {
@@ -54,6 +54,7 @@ function select(date: string) {
   <div class="period-controls">
     <div class="range-controls">
       <button
+        v-if="period !== 'all'"
         class="icon-button"
         aria-label="上一期间"
         :disabled="disabled || !adjacent(-1)"
@@ -63,13 +64,20 @@ function select(date: string) {
         <AppIcon name="caret-left" /></button
       ><button
         class="range-label"
-        :disabled="disabled"
-        :data-disabled-reason="disabled ? '正在读取收益数据，请稍候' : undefined"
+        :disabled="disabled || period === 'all'"
+        :data-disabled-reason="
+          period === 'all'
+            ? '全部数据范围固定为启用日至今'
+            : disabled
+              ? '正在读取收益数据，请稍候'
+              : undefined
+        "
         @click="choosing = true"
       >
         {{ range.from }}<span v-if="range.to !== range.from"> — {{ range.to }}</span
-        ><AppIcon name="calendar-blank" /></button
+        ><AppIcon v-if="period !== 'all'" name="calendar-blank" /></button
       ><button
+        v-if="period !== 'all'"
         class="icon-button"
         aria-label="下一期间"
         :disabled="disabled || !adjacent(1)"
@@ -94,7 +102,7 @@ function select(date: string) {
     </div>
   </div>
   <BaseOverlay
-    v-if="choosing"
+    v-if="choosing && period !== 'all'"
     :title="{ day: '选择日期', week: '选择周', month: '选择月份', year: '选择年份' }[period]"
     class="date-overlay"
     @request-close="choosing = false"

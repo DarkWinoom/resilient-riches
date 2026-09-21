@@ -3,89 +3,101 @@ import type { DashboardResponse, CategoryDetailResponse, Period } from '@resilie
 import type { AppDatabase } from '../database/database.ts';
 import { loadLedgerInput } from '../database/ledger-input.ts';
 import { ApiError } from './ledger-service.ts';
-
+import { performance, statisticsInput } from './performance.ts';
 export function createDashboardService(database: AppDatabase, clock: () => string) {
   function dashboard(period: Period, anchor: string): DashboardResponse {
     const today = clock();
-    const range = periodRange(period, anchor, today);
     const input = loadLedgerInput(database);
+    const stats = statisticsInput(input);
     const current = calculateLedger({ ...input, through: today, timeline: 'events' });
-    const daily = calculateLedger({ ...input, from: today, through: today, timeline: 'events' });
+    const week = calculateLedger({
+      ...input,
+      from: periodRange('week', today, today).from,
+      through: today,
+      timeline: 'events',
+    });
     const month = calculateLedger({
       ...input,
       from: today.slice(0, 7) + '-01',
       through: today,
       timeline: 'events',
     });
-    const selected = calculateLedger({
-      ...input,
-      from: range.from,
-      through: range.to,
-      timeline: 'period',
-      includeCurve: true,
-      includeOpeningHistory: true,
-    });
+    const allIncluded = stats.categories.length === input.categories.length;
+    const overviewCurrent = allIncluded
+      ? current
+      : calculateLedger({ ...stats, through: today, timeline: 'events' });
+    const overviewMonth = allIncluded
+      ? month
+      : calculateLedger({
+          ...stats,
+          from: today.slice(0, 7) + '-01',
+          through: today,
+          timeline: 'events',
+        });
+    const daily = calculateLedger({ ...stats, from: today, through: today, timeline: 'events' });
+    const selected = performance(stats, today, period, anchor);
+    const nowById = new Map(current.categories.map((item) => [item.categoryId, item.summary]));
+    const weekById = new Map(week.categories.map((item) => [item.categoryId, item.summary]));
+    const monthById = new Map(month.categories.map((item) => [item.categoryId, item.summary]));
     return {
       today,
-      earliestDate: input.categories.map((item) => item.openingDate).sort()[0] ?? null,
+      earliestDate: stats.categories.map((item) => item.openingDate).sort()[0] ?? null,
       period,
       anchor,
-      range,
+      range: selected.range,
       overview: {
         current: includeHistoricalReturn(
-          current.portfolio.summary,
-          input.categories.filter((category) => category.openingDate <= today),
+          overviewCurrent.portfolio.summary,
+          stats.categories.filter((category) => category.openingDate <= today),
         ),
         today: daily.portfolio.summary,
-        month: month.portfolio.summary,
+        month: overviewMonth.portfolio.summary,
       },
-      performance: selected.portfolio.summary,
-      curve: selected.portfolio.curve ?? [],
+      performance: selected.summary,
+      curve: selected.curve,
       categories: input.categories.map((category) => {
-        const now = current.categories.find((item) => item.categoryId === category.id)!.summary;
-        const chosen = selected.categories.find((item) => item.categoryId === category.id)!.summary;
+        const now = nowById.get(category.id)!;
+        const weekly = weekById.get(category.id)!;
+        const monthly = monthById.get(category.id)!;
+        const total = includeHistoricalReturn(now, [category]);
         return {
           ...category,
           balance: now.closingBalance,
           totalPnl: now.cumulativePnl,
           lastRecordedDate: now.lastRecordedDate,
-          periodPnl: chosen.periodPnl,
-          periodClosingBalance: chosen.closingBalance,
-          returnRate: chosen.returnRate,
-          rateReason: chosen.rateReason,
+          weekPnl: weekly.periodPnl,
+          weekReturnRate: weekly.returnRate,
+          monthPnl: monthly.periodPnl,
+          monthReturnRate: monthly.returnRate,
+          totalReturnRate: total.returnRate,
+          ...(total.historicalRateIncluded === false ? { historicalRateIncluded: false } : {}),
         };
       }),
     };
   }
   function detail(id: string, period: Period, anchor: string): CategoryDetailResponse {
-    const data = dashboard(period, anchor);
-    const category = data.categories.find((item) => item.id === id);
-    if (!category) throw new ApiError(404, 'CATEGORY_NOT_FOUND', '分类不存在或已被删除');
+    const today = clock();
     const input = loadLedgerInput(database);
-    const entries = input.entries.filter((item) => item.categoryId === id);
-    const ledger = calculateLedger({
+    const category = input.categories.find((item) => item.id === id);
+    if (!category) throw new ApiError(404, 'CATEGORY_NOT_FOUND', '分类不存在或已被删除');
+    const own = {
       categories: [category],
-      entries,
-      from: data.range.from,
-      through: data.range.to,
-      timeline: 'period',
-      includeCurve: true,
-      includeOpeningHistory: true,
-    });
-    const days = new Map(ledger.categories[0]!.days.map((day) => [day.date, day]));
+      entries: input.entries.filter((item) => item.categoryId === id),
+    };
+    const current = calculateLedger({ ...own, through: today, timeline: 'events' }).portfolio
+      .summary;
+    const selected = performance(own, today, period, anchor);
     return {
-      category,
-      days: ledger.portfolio.days,
-      range: data.range,
-      curve: ledger.portfolio.curve ?? [],
-      records: entries
-        .filter((item) => item.date >= data.range.from && item.date <= data.range.to)
-        .reverse()
-        .map((entry) => ({
-          ...entry,
-          pnl: days.get(entry.date)!.pnl,
-          returnRate: days.get(entry.date)!.returnRate,
-        })),
+      category: {
+        ...category,
+        balance: current.closingBalance,
+        totalPnl: current.cumulativePnl,
+        lastRecordedDate: current.lastRecordedDate,
+      },
+      performance: selected.summary,
+      range: selected.range,
+      curve: selected.curve,
+      days: selected.ledger.portfolio.days,
     };
   }
   return { dashboard, detail };

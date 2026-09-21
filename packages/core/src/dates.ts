@@ -1,7 +1,7 @@
 import { LedgerError } from './errors.ts';
 
 export const BUSINESS_TIMEZONE = 'Asia/Shanghai';
-export type Period = 'day' | 'week' | 'month' | 'year';
+export type Period = 'day' | 'week' | 'month' | 'year' | 'all';
 export interface DateRange {
   from: string;
   to: string;
@@ -56,7 +56,12 @@ export function validateEntryDate(value: string, latest = today()): void {
   if (value > latest) throw new LedgerError('FUTURE_DATE', '不能录入未来日期', 'date');
 }
 
-export function periodRange(period: Period, anchor: string, latest = today()): DateRange {
+export function periodRange(
+  period: Period,
+  anchor: string,
+  latest = today(),
+  earliest = latest,
+): DateRange {
   validateEntryDate(anchor, latest);
   const date = parseDate(anchor);
   const year = date.getUTCFullYear();
@@ -64,6 +69,9 @@ export function periodRange(period: Period, anchor: string, latest = today()): D
   let from = anchor;
   let to = anchor;
   switch (period) {
+    case 'all':
+      validateEntryDate(earliest, latest);
+      return { from: earliest, to: latest };
     case 'day':
       break;
     case 'week':
@@ -92,4 +100,14 @@ export function* datesBetween(from: string, to: string): Generator<string> {
     yield date;
     if (date === to) break;
   }
+}
+
+export function periodLabel(period: Period, current = true): string {
+  return {
+    day: '当日',
+    week: current ? '本周' : '当周',
+    month: current ? '本月' : '当月',
+    year: current ? '本年' : '当年',
+    all: '累计',
+  }[period];
 }

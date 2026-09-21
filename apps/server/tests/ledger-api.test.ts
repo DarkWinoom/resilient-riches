@@ -59,11 +59,11 @@ describe('ledger write API', () => {
 
   it('counts complete days against categories active on that date', async () => {
     const app = await setup();
-    const a = await create(app, '已归档', { openingBalance: '0', historicalPnl: '0' });
+    const a = await create(app, '不参与统计', { openingBalance: '0', historicalPnl: '0' });
     await app.inject({
       method: 'PATCH',
       url: `/api/v1/categories/${a.id}`,
-      payload: { revision: a.revision, archivedOn: '2026-09-05' },
+      payload: { revision: a.revision, includeInStats: false },
     });
     await create(app, '后来启用', { openingDate: '2026-09-06' });
     await create(app, '持续持有');
@@ -75,7 +75,7 @@ describe('ledger write API', () => {
     await save(app, '2026-09-06', [write(await day(app, '2026-09-06'), 0)]);
     expect((await calendar()).days).toEqual([
       { date: '2026-09-04', count: 2, total: 2 },
-      { date: '2026-09-06', count: 1, total: 2 },
+      { date: '2026-09-06', count: 1, total: 3 },
     ]);
   });
   it('creates, lists, edits and rejects duplicate category names', async () => {
@@ -236,35 +236,6 @@ describe('ledger write API', () => {
       '200.00',
       '200.00',
     ]);
-  });
-  it('archives only empty categories, retains history and restores without re-adding initial funds', async () => {
-    const app = await setup();
-    const item = await create(app);
-    expect(
-      (
-        await app.inject({
-          method: 'PATCH',
-          url: `/api/v1/categories/${item.id}`,
-          payload: { revision: 1, archivedOn: '2026-09-12' },
-        })
-      ).statusCode,
-    ).toBe(400);
-    const view = await day(app, '2026-09-12');
-    await save(app, view.date, [write(view, 0, { sell: '10000', closingBalance: '0' })]);
-    const archive = await app.inject({
-      method: 'PATCH',
-      url: `/api/v1/categories/${item.id}`,
-      payload: { revision: 2, archivedOn: '2026-09-12' },
-    });
-    expect(archive.statusCode).toBe(200);
-    expect((await day(app, '2026-09-13')).items).toHaveLength(0);
-    expect((await day(app, '2026-09-12')).items[0]?.entry).not.toBeNull();
-    await app.inject({
-      method: 'PATCH',
-      url: `/api/v1/categories/${item.id}`,
-      payload: { revision: 3, archivedOn: null },
-    });
-    expect((await day(app, '2026-09-13')).items[0]?.openingBalance).toBe('0.00');
   });
   it('checks deletion impact and confirmation, and catches records added after impact was read', async () => {
     const app = await setup();

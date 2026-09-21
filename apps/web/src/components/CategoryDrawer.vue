@@ -5,7 +5,6 @@ import { api, errorMessage, RequestError } from '../api.ts';
 import { useConfirm } from '../composables/useConfirm.ts';
 import { useToast } from '../composables/useToast.ts';
 import { categoryErrors } from '../utils/forms.ts';
-import LiquidationDialog from './LiquidationDialog.vue';
 import CategoryForm from './CategoryForm.vue';
 import AppButton from './ui/AppButton.vue';
 import BaseOverlay from './ui/BaseOverlay.vue';
@@ -18,12 +17,11 @@ const props = defineProps<{
 const emit = defineEmits<{ close: []; changed: [] }>();
 const { pending, ask, finish } = useConfirm();
 const { success } = useToast();
-const liquidating = ref(false);
-const previous = ref<CategoryView | null>(null);
 const selected = ref(props.items.find((item) => item.id === props.initialId) ?? null);
 function defaults(): CategoryValues {
   return selected.value
     ? {
+        includeInStats: selected.value.includeInStats !== false,
         name: selected.value.name,
         color: selected.value.color,
         openingDate: selected.value.openingDate,
@@ -32,6 +30,7 @@ function defaults(): CategoryValues {
         note: selected.value.note,
       }
     : {
+        includeInStats: true,
         name: '',
         color: '#b69a60',
         openingDate: props.today,
@@ -118,37 +117,13 @@ async function save() {
         revision: selected.value.revision,
       });
     else await api.createCategory(values.value);
-    success(previous.value ? '分类已重新激活' : selected.value ? '分类已修改' : '分类已新增');
+    success(selected.value ? '分类已修改' : '分类已新增');
     completed();
   } catch (failure) {
     failed(failure);
   } finally {
     busy.value = false;
   }
-}
-function settlement() {
-  const item = selected.value;
-  if (!item || busy.value) return;
-  if (dirty.value) {
-    error.value = '请先保存分类修改，再进行清仓或重新激活。';
-    return;
-  }
-  if (!item.archivedOn) {
-    liquidating.value = true;
-    return;
-  }
-  previous.value = item;
-  selected.value = null;
-  initial.value = {
-    name: item.name,
-    color: item.color,
-    note: item.note,
-    openingDate: props.today,
-    openingBalance: '0.00',
-    historicalPnl: item.totalPnl,
-    previousCycleId: item.id,
-  };
-  values.value = { ...initial.value };
 }
 async function remove() {
   const item = selected.value;
@@ -178,14 +153,11 @@ async function remove() {
 </script>
 <template>
   <BaseOverlay
-    :title="previous ? '重新激活分类' : selected ? '编辑分类' : '新增分类'"
+    :title="selected ? '编辑分类' : '新增分类'"
     kind="drawer"
     :busy="busy"
     @request-close="close"
     ><div class="drawer-body">
-      <p v-if="previous" class="detail-note">
-        已将上次清仓金额填入历史盈亏，可按实际情况修改。保存后，以本次填写的初始资金、历史盈亏和启用日期重新计算。
-      </p>
       <form id="category-form" ref="form" @submit.prevent="save">
         <CategoryForm
           :today="today"
@@ -202,12 +174,7 @@ async function remove() {
         >
       </div>
       <div v-if="selected" class="category-maintenance">
-        <AppButton
-          :disabled="busy || items.some((item) => item.previousCycleId === selected?.id)"
-          :disabled-reason="busy ? '正在保存，请稍候' : '此轮持仓已重新激活'"
-          @click="settlement"
-          >{{ selected.archivedOn ? '重新激活' : '一键清仓' }}</AppButton
-        ><AppButton variant="quiet" class="danger-text" :disabled="busy" @click="remove"
+        <AppButton variant="quiet" class="danger-text" :disabled="busy" @click="remove"
           >删除分类</AppButton
         >
       </div>
@@ -215,13 +182,8 @@ async function remove() {
     <footer class="overlay-footer">
       <AppButton :disabled="busy" @click="close">取消</AppButton
       ><AppButton variant="primary" :loading="busy" @click="save">{{
-        previous ? '开始新持仓' : selected ? '保存修改' : '新增分类'
+        selected ? '保存修改' : '新增分类'
       }}</AppButton>
     </footer></BaseOverlay
-  ><LiquidationDialog
-    v-if="liquidating && selected"
-    :category="selected"
-    @close="liquidating = false"
-    @saved="completed"
-  /><ConfirmDialog v-if="pending" :request="pending" @answer="finish" />
+  ><ConfirmDialog v-if="pending" :request="pending" @answer="finish" />
 </template>

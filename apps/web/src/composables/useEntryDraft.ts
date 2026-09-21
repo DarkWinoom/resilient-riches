@@ -20,6 +20,7 @@ export function useEntryDraft(
   initialId: string | null,
   changed: (action: 'save' | 'delete') => void,
   initialDate = today,
+  onlyCategoryId: string | null = null,
 ) {
   const { success } = useToast();
   const date = ref(initialDate),
@@ -66,12 +67,14 @@ export function useEntryDraft(
   }
   function accept(result: EntryDayResponse, submitted: string[] = []) {
     const previous = cache.value[result.date] ?? [];
-    const next = result.items.map((item) => {
-      const draft = previous.find((value) => value.values.categoryId === item.category.id);
-      if (!draft?.dirty || submitted.includes(item.category.id)) return from(item);
-      if (draft.values.categoryRevision === item.category.revision) draft.reference = item;
-      return draft;
-    });
+    const next = result.items
+      .filter((item) => !onlyCategoryId || item.category.id === onlyCategoryId)
+      .map((item) => {
+        const draft = previous.find((value) => value.values.categoryId === item.category.id);
+        if (!draft?.dirty || submitted.includes(item.category.id)) return from(item);
+        if (draft.values.categoryRevision === item.category.revision) draft.reference = item;
+        return draft;
+      });
     next.push(
       ...previous.filter(
         (item) =>
@@ -93,7 +96,7 @@ export function useEntryDraft(
     ready.value = false;
     error.value = '';
     try {
-      const result = await api.day(date.value, controller.signal);
+      const result = await api.day(date.value, controller.signal, onlyCategoryId ?? undefined);
       if (!controller.signal.aborted) accept(result);
     } catch (failure) {
       if (!controller.signal.aborted) error.value = errorMessage(failure);
@@ -108,7 +111,11 @@ export function useEntryDraft(
     calendarLoading.value = true;
     calendarError.value = '';
     try {
-      const result = await api.calendar(month.value, controller.signal);
+      const result = await api.calendar(
+        month.value,
+        controller.signal,
+        onlyCategoryId ?? undefined,
+      );
       if (!controller.signal.aborted) calendar.value = result;
     } catch (failure) {
       if (!controller.signal.aborted) calendarError.value = errorMessage(failure);
@@ -167,7 +174,7 @@ export function useEntryDraft(
   async function save() {
     if (busy.value || !ready.value || !active.value) return;
     const entries = drafts.value.filter((item) => item.dirty);
-    if (!entries.length) entries.push(active.value);
+    if (!entries.length) return;
     for (const draft of entries) {
       const found = entryErrors(draft.values);
       try {
@@ -200,6 +207,7 @@ export function useEntryDraft(
       message.value = `已保存 ${ids.length} 个分类的记录`;
       success(message.value);
       changed('save');
+      await loadCalendar();
     } catch (failure) {
       error.value = errorMessage(failure);
     } finally {

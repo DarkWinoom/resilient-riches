@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
-import { periodRange } from '@resilient-riches/core';
+import { periodRange, periodLabel } from '@resilient-riches/core';
 import type { CategoryDetailResponse, Period } from '@resilient-riches/core';
 import { api, errorMessage } from '../../api.ts';
 import {
@@ -21,10 +21,20 @@ const props = defineProps<{
   privateMode: boolean;
 }>();
 defineEmits<{ close: []; record: [id: string, date: string] }>();
-const period = ref<Period>('year');
+const period = ref<Period>('week');
 const anchor = ref(props.today);
 const displayedPeriod = ref<Period>('year');
-const range = computed(() => periodRange(period.value, anchor.value, props.today));
+const range = computed(() =>
+  periodRange(
+    period.value,
+    anchor.value,
+    props.today,
+    data.value?.category.openingDate ?? props.today,
+  ),
+);
+const label = computed(() =>
+  periodLabel(displayedPeriod.value, data.value?.range.to === props.today),
+);
 async function choose(value: Period, date: string) {
   period.value = value;
   anchor.value = date;
@@ -72,7 +82,6 @@ onUnmounted(() => controller?.abort());
           :today="today"
           :range="range"
           :disabled="loading"
-          reverse
           @change="choose"
         />
       </div>
@@ -84,15 +93,15 @@ onUnmounted(() => controller?.abort());
         </div>
         <div class="detail-metrics">
           <div>
-            <span>本期收益</span
-            ><strong :class="amountTone(data.category.periodPnl)">{{
-              privateMode ? '••••' : signedMoney(data.category.periodPnl)
+            <span>{{ label }}收益</span
+            ><strong :class="amountTone(data.performance.periodPnl)">{{
+              privateMode ? '••••' : signedMoney(data.performance.periodPnl)
             }}</strong>
           </div>
           <div>
-            <span>本期收益率</span
-            ><strong :class="amountTone(data.category.returnRate ?? '0')">{{
-              rateLabel(data.category.returnRate)
+            <span>{{ label }}收益率</span
+            ><strong :class="amountTone(data.performance.returnRate ?? '0')">{{
+              rateLabel(data.performance.returnRate)
             }}</strong>
           </div>
           <div>
@@ -109,51 +118,17 @@ onUnmounted(() => controller?.abort());
           {{ data.category.note }}
         </p>
         <p class="muted">{{ data.range.from }} — {{ data.range.to }}</p>
-        <div v-if="displayedPeriod === 'month' || displayedPeriod === 'year'" class="detail-chart">
+        <div class="detail-chart">
           <ReturnChart :points="data.curve" :private-mode="privateMode" :loading="loading" />
         </div>
-        <div v-else class="detail-daily">
-          <h3>每日盈亏</h3>
-          <table>
-            <thead>
-              <tr>
-                <th>日期</th>
-                <th class="numeric">盈亏金额</th>
-                <th class="numeric">收益率</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="day in data.days" :key="day.date">
-                <td>
-                  {{ day.date
-                  }}<span class="muted daily-source">{{
-                    day.source === 'recorded'
-                      ? '已记录'
-                      : day.source === 'archived'
-                        ? '已清仓'
-                        : '无变动'
-                  }}</span>
-                </td>
-                <td class="numeric" :class="amountTone(day.pnl)">
-                  {{ privateMode ? '••••' : signedMoney(day.pnl) }}
-                </td>
-                <td class="numeric" :class="amountTone(day.returnRate ?? '0')">
-                  {{ rateLabel(day.returnRate) }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div></template
-      >
+      </template>
     </div>
     <footer class="overlay-footer">
       <AppButton @click="$emit('close')">关闭</AppButton
       ><AppButton
         variant="primary"
-        :disabled="!data || !!data.category.archivedOn"
-        :disabled-reason="
-          !data ? '分类信息尚未加载，请等待或重试' : '分类已清仓，请重新激活后记录今天'
-        "
+        :disabled="!data"
+        :disabled-reason="'分类信息尚未加载，请等待或重试'"
         @click="$emit('record', id, today)"
         >记录盈亏</AppButton
       >

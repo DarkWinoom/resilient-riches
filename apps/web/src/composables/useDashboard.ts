@@ -7,7 +7,7 @@ export function useDashboard() {
   const { success } = useToast();
   const sorting = ref(false);
   const data = ref<DashboardResponse | null>(null);
-  const period = ref<Period>('month'),
+  const period = ref<Period>('week'),
     anchor = ref(''),
     today = ref('');
   const loading = ref(false),

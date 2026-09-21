@@ -19,6 +19,7 @@ export function categoryFromRow(row: Row): CategoryRecord {
     id: text(row, 'id'),
     previousCycleId: row.previous_cycle_id == null ? null : text(row, 'previous_cycle_id'),
     name: text(row, 'name'),
+    includeInStats: row.include_in_stats == null || row.include_in_stats === 1n,
     color: text(row, 'color'),
     openingDate: text(row, 'opening_date'),
     openingBalance: formatMoney(integer(row, 'opening_balance_minor')),

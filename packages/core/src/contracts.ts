@@ -1,18 +1,13 @@
-import type {
-  Category,
-  DailyEntry,
-  DayResult,
-  PerformanceSummary,
-  CurvePoint,
-  RateReason,
-} from './types.ts';
+import type { Category, DailyEntry, DayResult, PerformanceSummary, CurvePoint } from './types.ts';
 import type { DateRange, Period } from './dates.ts';
 
 export interface DashboardCategory extends CategoryView {
-  periodPnl: string;
-  periodClosingBalance: string;
-  returnRate: string | null;
-  rateReason: RateReason | null;
+  weekPnl: string;
+  weekReturnRate: string | null;
+  monthPnl: string;
+  monthReturnRate: string | null;
+  totalReturnRate: string | null;
+  historicalRateIncluded?: boolean;
 }
 export interface DashboardResponse {
   today: string;
@@ -27,10 +22,10 @@ export interface DashboardResponse {
 }
 export interface CategoryDetailResponse {
   days: DayResult[];
-  category: DashboardCategory;
+  performance: PerformanceSummary;
+  category: CategoryView;
   range: DateRange;
   curve: CurvePoint[];
-  records: (EntryRecord & { pnl: string; returnRate: string | null })[];
 }
 
 export interface ReportCategory {
@@ -56,7 +51,7 @@ export interface ReportResponse {
 }
 
 export interface CategoryValues {
-  previousCycleId?: string | null;
+  includeInStats?: boolean;
   name: string;
   color: string;
   openingDate: string;
@@ -88,7 +83,6 @@ export interface CategoryListResponse {
 
 export type CategoryPatch = Partial<CategoryValues> & {
   revision: number;
-  archivedOn?: string | null;
 };
 
 export interface EntryRecord extends DailyEntry {

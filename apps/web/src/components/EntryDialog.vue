@@ -9,7 +9,12 @@ import AppButton from './ui/AppButton.vue';
 import AppTabs from './ui/AppTabs.vue';
 import BaseOverlay from './ui/BaseOverlay.vue';
 import ConfirmDialog from './ui/ConfirmDialog.vue';
-const props = defineProps<{ today: string; initialId: string | null; initialDate?: string }>();
+const props = defineProps<{
+  today: string;
+  initialId: string | null;
+  initialDate?: string;
+  singleCategory?: boolean;
+}>();
 const emit = defineEmits<{ close: []; changed: [] }>();
 const { pending, ask, finish } = useConfirm();
 const {
@@ -41,9 +46,15 @@ const {
   props.initialId,
   (action) => {
     emit('changed');
-    if (action === 'save') emit('close');
+    if (action === 'save' && date.value === props.today) emit('close');
   },
   props.initialDate,
+  props.singleCategory ? props.initialId : null,
+);
+const title = computed(() =>
+  props.singleCategory && active.value
+    ? `${active.value.reference.category.name}·记录盈亏`
+    : '记录盈亏',
 );
 const form = useTemplateRef<HTMLFormElement>('form');
 async function submit() {
@@ -118,7 +129,7 @@ async function deleteRecord() {
 }
 </script>
 <template>
-  <BaseOverlay title="每日记录" class="entry-overlay" :busy="busy" @request-close="close"
+  <BaseOverlay :title="title" class="entry-overlay" :busy="busy" @request-close="close"
     ><div class="entry-layout">
       <EntryCalendar
         :month="month"
@@ -140,6 +151,7 @@ async function deleteRecord() {
           <span v-if="dirtyCount" class="muted">{{ dirtyCount }} 个草稿待保存</span>
         </div>
         <AppTabs
+          v-if="!singleCategory"
           v-model="selectedId"
           :items="tabs"
           label="选择分类"
@@ -148,8 +160,10 @@ async function deleteRecord() {
         />
         <div
           id="entry-panel"
-          role="tabpanel"
-          :aria-labelledby="selectedId ? `entry-panel-tab-${selectedId}` : undefined"
+          :role="singleCategory ? undefined : 'tabpanel'"
+          :aria-labelledby="
+            !singleCategory && selectedId ? `entry-panel-tab-${selectedId}` : undefined
+          "
           class="entry-panel"
         >
           <form
@@ -189,7 +203,7 @@ async function deleteRecord() {
       ><AppButton :disabled="busy" @click="close">关闭</AppButton
       ><AppButton
         variant="primary"
-        :disabled="!ready || !active"
+        :disabled="!ready || !active || !dirtyCount"
         :loading="busy"
         :disabled-reason="
           busy
@@ -198,7 +212,9 @@ async function deleteRecord() {
               ? '正在读取记录，请稍候'
               : !ready
                 ? '所选日期尚未加载，请重新载入'
-                : '该日期暂无可录入分类，请选择其它日期或新增分类'
+                : !active
+                  ? '该日期暂无可录入分类，请选择其它日期或新增分类'
+                  : '修改当日数据后即可保存'
         "
         @click="submit"
         >保存当日记录</AppButton

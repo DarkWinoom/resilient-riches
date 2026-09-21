@@ -13,6 +13,46 @@ const emptyPoint: CurvePoint = {
   rateReason: 'no_capital',
 };
 describe('return chart empty interaction', () => {
+  it('plots assets and shows only cash flows and profit in the asset tooltip', async () => {
+    const wrapper = mount(ReturnChart, {
+      props: {
+        points: [
+          {
+            ...emptyPoint,
+            closingBalance: '1000.00',
+            buy: '1000.00',
+            sell: '0.00',
+            pnl: '0.00',
+            returnRate: '0',
+          },
+          {
+            ...emptyPoint,
+            date: '2026-09-14',
+            closingBalance: '1205.00',
+            buy: '250.00',
+            sell: '50.00',
+            pnl: '5.00',
+            returnRate: '0.004',
+          },
+        ],
+        privateMode: false,
+        loading: false,
+      },
+    });
+    expect(wrapper.get('h2').text()).toBe('资产走势');
+    await wrapper.findAll('.chart-modes button')[1]!.trigger('click');
+    await wrapper.get('.return-plot').trigger('keydown', { key: 'End' });
+    const tip = wrapper.get('.chart-tooltip').text();
+    expect(tip).toContain('当日转入 250.00');
+    expect(tip).toContain('当日转出 50.00');
+    expect(tip).toContain('收益金额 +5.00');
+    expect(tip).not.toMatch(/%|收益率/);
+    expect(wrapper.get('.return-plot').attributes('aria-label')).toContain('每日总资产');
+    await wrapper.setProps({ privateMode: true });
+    expect(wrapper.findAll('.chart-modes button')).toHaveLength(1);
+    expect(wrapper.get('.return-plot').attributes('aria-label')).toContain('收益率');
+    wrapper.unmount();
+  });
   it.each([{ points: [] }, { points: [emptyPoint] }])(
     'does not show a tooltip on an empty chart',
     async ({ points }) => {

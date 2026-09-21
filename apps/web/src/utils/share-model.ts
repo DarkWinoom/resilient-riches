@@ -8,6 +8,7 @@ export interface ShareAmounts {
   pnl: string;
 }
 export interface ShareModel {
+  historicalRateIncluded?: boolean;
   period: Period;
   range: DateRange;
   current: boolean;
@@ -19,6 +20,10 @@ export interface ShareModel {
 }
 export function buildShareModel(report: ReportResponse, options: ShareOptions): ShareModel {
   return {
+    ...(report.summary.historicalRateIncluded === false ||
+    report.curve.some((point) => point.historicalRateIncluded === false)
+      ? { historicalRateIncluded: false }
+      : {}),
     period: report.period,
     range: { from: report.range.from, to: report.range.to },
     current: report.current,
@@ -50,6 +55,7 @@ export const reportTitles: Record<Period, string> = {
   week: '收益周报',
   month: '收益月报',
   year: '收益年报',
+  all: '收益总览',
 };
 export function shareFilename(model: ShareModel): string {
   return `resilient-riches-${model.period}-${model.range.from}-${model.range.to}${model.amounts ? '' : '-percent'}${model.categories ? '' : '-overview'}.png`;

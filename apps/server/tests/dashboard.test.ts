@@ -73,8 +73,8 @@ describe('dashboard aggregation', () => {
     expect(past.performance.periodPnl).toBe('100.00');
     expect(past.categories[0]).toMatchObject({
       balance: '1210.00',
-      periodClosingBalance: '1100.00',
-      periodPnl: '100.00',
+      monthPnl: '110.00',
+      monthReturnRate: '0.1',
     });
   });
   it('uses identical report and dashboard results across all four periods', async () => {
@@ -113,19 +113,15 @@ describe('dashboard aggregation', () => {
     ).json<ReportResponse>();
     expect(report.commentary.join('')).toContain('2 个分类盈利，1 个分类亏损');
     expect(report.commentary.join('')).toContain('66.7%');
-    expect(report.commentary.join('')).toContain('“亏损丙”是本期主要亏损来源');
+    expect(report.commentary.join('')).toContain('“亏损丙”是本月主要亏损来源');
     expect(report.commentary.join('')).not.toMatch(/跑赢|排名|市场|指数/);
     expect(report.summary.periodPnl).toBe('-50.00');
   });
-  it('includes archived historical results and distinguishes a no-record report', async () => {
-    const { app, service, category, write } = await setup();
+  it('includes fully withdrawn historical results and distinguishes a no-record report', async () => {
+    const { app, category, write } = await setup();
     const a = category('旧分类', '2026-08-01');
     write(a.id, '2026-08-30', '1100');
     write(a.id, '2026-08-31', '0', '0', '1100');
-    service.updateCategory(a.id, {
-      revision: service.listCategories().items[0]!.revision,
-      archivedOn: '2026-08-31',
-    });
     const past = (
       await app.inject({ url: '/api/v1/reports?period=month&anchor=2026-08-01' })
     ).json<ReportResponse>();
@@ -135,7 +131,7 @@ describe('dashboard aggregation', () => {
     const current = (
       await app.inject({ url: '/api/v1/reports?period=month&anchor=2026-09-13' })
     ).json<ReportResponse>();
-    expect(current.categories).toHaveLength(1);
+    expect(current.categories).toHaveLength(2);
     expect(current.recordCount).toBe(0);
     expect(current.commentary.join('')).toContain('没有录入记录');
   });
@@ -151,7 +147,7 @@ describe('dashboard aggregation', () => {
     expect(data.performance).toMatchObject({ periodPnl: '100.00', returnRate: '0.05' });
     expect(
       data.categories
-        .reduce((sum, row) => sum.plus(row.periodPnl), new FinancialDecimal(0))
+        .reduce((sum, row) => sum.plus(row.monthPnl), new FinancialDecimal(0))
         .toFixed(2),
     ).toBe(data.performance.periodPnl);
     expect(data.curve.at(-1)).toMatchObject({
@@ -174,26 +170,24 @@ describe('dashboard aggregation', () => {
     const detail = (
       await app.inject({ url: `/api/v1/categories/${a.id}/detail?period=month&anchor=2026-09-13` })
     ).json<CategoryDetailResponse>();
-    expect(detail.records).toHaveLength(1);
-    expect(detail.records[0]).toMatchObject({
+    expect(detail.days.filter((day) => day.source === 'recorded')).toHaveLength(1);
+    expect(detail.days.find((day) => day.date === '2026-09-11')).toMatchObject({
       date: '2026-09-11',
       pnl: '20.00',
       returnRate: '0.02',
     });
   });
-  it('returns empty historical periods and keeps archived profits in totals', async () => {
-    const { service, category, write, get } = await setup();
+  it('returns empty historical periods and keeps withdrawn profits in totals', async () => {
+    const { category, write, get } = await setup();
     const a = category('A', '2026-09-01', '1000', '50');
     write(a.id, '2026-09-02', '1100');
     write(a.id, '2026-09-03', '0', '0', '1100');
-    const updated = service.listCategories().items[0]!;
-    service.updateCategory(a.id, { revision: updated.revision, archivedOn: '2026-09-03' });
     const data = await get();
     expect(data.overview.current).toMatchObject({
       closingBalance: '0.00',
       cumulativePnl: '150.00',
     });
-    expect(data.categories[0]).toMatchObject({ archivedOn: '2026-09-03', periodPnl: '100.00' });
+    expect(data.categories[0]).toMatchObject({ monthPnl: '100.00' });
     const earlier = await get('month', '2026-08-01');
     expect(earlier.performance.periodPnl).toBe('0.00');
     expect(earlier.curve.every((point) => point.returnRate === null)).toBe(true);
@@ -233,7 +227,7 @@ describe('dashboard aggregation', () => {
     const { app, get } = await setup();
     expect((await get()).categories).toEqual([]);
     for (const query of [
-      'period=all&anchor=2026-09-13',
+      'period=invalid&anchor=2026-09-13',
       'period=month&anchor=2026-02-30',
       'period=day&anchor=2026-09-14',
     ])

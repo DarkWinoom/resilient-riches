@@ -15,10 +15,9 @@ const props = withDefaults(
     items: readonly DashboardCategory[];
     today: string;
     disabled?: boolean;
-    periodLabel?: string;
     privateMode?: boolean;
   }>(),
-  { periodLabel: '本期', privateMode: false },
+  { privateMode: false },
 );
 const emit = defineEmits<{ view: [id: string]; edit: [id: string]; reorder: [ids: string[]] }>();
 const dragging = ref<string | null>(null);
@@ -59,7 +58,7 @@ function move(id: string, delta: number) {
   dragging.value = id;
   drop(target.id);
 }
-type SortKey = 'balance' | 'periodPnl' | 'returnRate' | 'totalPnl';
+type SortKey = 'balance' | 'weekPnl' | 'monthPnl' | 'totalPnl';
 const sort = ref<SortKey | null>(null),
   descending = ref(true);
 const sorted = computed(() => {
@@ -73,9 +72,9 @@ const sorted = computed(() => {
   });
 });
 const columns = computed(() => [
-  { key: 'balance' as const, label: '当前金额' },
-  { key: 'periodPnl' as const, label: `${props.periodLabel}收益` },
-  { key: 'returnRate' as const, label: `${props.periodLabel}收益率` },
+  { key: 'balance' as const, label: '总金额' },
+  { key: 'weekPnl' as const, label: '本周收益' },
+  { key: 'monthPnl' as const, label: '本月收益' },
   { key: 'totalPnl' as const, label: '累计盈亏' },
 ]);
 function order(key: SortKey) {
@@ -95,14 +94,7 @@ function order(key: SortKey) {
         :aria-pressed="sort === column.key"
         @click="order(column.key)"
       >
-        {{
-          column.key === 'balance'
-            ? '金额'
-            : column.key === 'periodPnl'
-              ? '收益'
-              : column.key === 'returnRate'
-                ? '收益率'
-                : '累计盈亏'
+        {{ column.label
         }}<AppIcon v-if="sort === column.key" :name="descending ? 'arrow-down' : 'arrow-up'" />
       </button>
     </div>
@@ -120,7 +112,7 @@ function order(key: SortKey) {
       <thead>
         <tr>
           <th class="drag-heading" aria-label="拖动排序"></th>
-          <th>资产分类</th>
+          <th>名称</th>
           <th
             v-for="column in columns"
             :key="column.key"
@@ -145,7 +137,10 @@ function order(key: SortKey) {
           v-for="item in sorted"
           :key="item.id"
           :data-category-id="item.id"
-          :class="{ 'holding-drop-target': targetId === item.id && dragging !== item.id }"
+          :class="{
+            'holding-drop-target': targetId === item.id && dragging !== item.id,
+            'holding-excluded': item.includeInStats === false,
+          }"
         >
           <td class="drag-cell">
             <button
@@ -173,32 +168,29 @@ function order(key: SortKey) {
                 ><AppIcon name="wallet" /></span
               ><span
                 ><strong>{{ item.name }}</strong
-                ><span v-if="item.archivedOn" class="muted holding-note">已清仓</span
-                ><span v-else-if="item.note && !privateMode" class="muted holding-note">{{
+                ><span v-if="item.note && !privateMode" class="muted holding-note">{{
                   item.note
                 }}</span></span
               >
             </button>
           </td>
-          <td class="numeric" data-label="当前金额">
+          <td class="numeric" data-label="总金额">
             {{ privateMode ? '••••' : moneyLabel(item.balance) }}
           </td>
-          <td
-            class="numeric"
-            :data-label="`${periodLabel}收益`"
-            :class="amountTone(item.periodPnl)"
-          >
-            {{ privateMode ? '••••' : signedMoney(item.periodPnl) }}
+          <td class="numeric" data-label="本周收益" :class="amountTone(item.weekPnl)">
+            {{ privateMode ? '••••' : signedMoney(item.weekPnl)
+            }}<span class="holding-rate">{{ rateLabel(item.weekReturnRate) }}</span>
           </td>
-          <td
-            class="numeric"
-            :data-label="`${periodLabel}收益率`"
-            :class="amountTone(item.returnRate ?? '0')"
-          >
-            {{ rateLabel(item.returnRate) }}
+          <td class="numeric" data-label="本月收益" :class="amountTone(item.monthPnl)">
+            {{ privateMode ? '••••' : signedMoney(item.monthPnl)
+            }}<span class="holding-rate">{{ rateLabel(item.monthReturnRate) }}</span>
           </td>
           <td class="numeric" data-label="累计盈亏" :class="amountTone(item.totalPnl)">
-            {{ privateMode ? '••••' : signedMoney(item.totalPnl) }}
+            {{ privateMode ? '••••' : signedMoney(item.totalPnl)
+            }}<span class="holding-rate">{{ rateLabel(item.totalReturnRate) }}</span
+            ><span v-if="item.historicalRateIncluded === false" class="holding-rate muted"
+              >启用后收益率</span
+            >
           </td>
           <td
             class="muted last-recorded numeric"
