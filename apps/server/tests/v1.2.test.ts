@@ -96,7 +96,7 @@ describe('v1.2 statistics and asset history', () => {
     write(a.id, '2026-09-01', '1002', '1000');
     write(a.id, '2026-09-02', '9800', '9000');
     const result = dashboard.detail(a.id, 'all', today);
-    const rate = new FinancialDecimal('1.002')
+    const rate = new FinancialDecimal('16.002')
       .mul(new FinancialDecimal(9800).div(10002))
       .minus(1)
       .toDecimalPlaces(30)
@@ -104,16 +104,33 @@ describe('v1.2 statistics and asset history', () => {
     expect(result.performance).toMatchObject({
       cumulativePnl: '14800.00',
       returnRate: rate,
-      historicalRateIncluded: false,
     });
     expect(result.curve.at(-1)).toMatchObject({
       returnRate: rate,
       cumulativePnl: '14800.00',
-      historicalRateIncluded: false,
     });
     expect(result.curve[0]).toMatchObject({ pnl: '2.00', buy: '1000.00' });
     const b = create('超过百分之百', { openingBalance: '1000', historicalPnl: '750' });
     expect(dashboard.detail(b.id, 'all', today).performance.returnRate).toBe('3');
+  });
+  it('shows deferred historical profit consistently in cumulative cards, holdings, details and reports', () => {
+    const { create, write, dashboard, report, today } = setup();
+    const a = create('延后本金', { openingBalance: '0', historicalPnl: '15000' });
+    expect(dashboard.dashboard('all', today).overview.current.returnRate).toBeNull();
+    write(a.id, '2026-09-15', '9800', '10000');
+    const data = dashboard.dashboard('all', today);
+    expect(data.overview.current.returnRate).toBe('1.48');
+    expect(data.categories[0]?.totalReturnRate).toBe('1.48');
+    expect(data.performance.returnRate).toBe('1.48');
+    expect(data.curve[0]?.returnRate).toBeNull();
+    expect(data.curve.at(-1)?.returnRate).toBe('1.48');
+    expect(dashboard.detail(a.id, 'all', today).performance.returnRate).toBe('1.48');
+    const totalReport = report('all', today);
+    expect(totalReport.summary.returnRate).toBe('1.48');
+    expect(totalReport.categories[0]?.returnRate).toBe('1.48');
+    expect(totalReport.commentary.join('')).not.toMatch(/历史本金|无法|启用后/);
+    expect(dashboard.dashboard('month', today).categories).toEqual(data.categories);
+    expect(data.categories[0]?.monthReturnRate).toBe('-0.02');
   });
   it('preserves old settlement records during migration and allows subsequent recording', () => {
     const path = join(fixture.directory(), 'old.sqlite');

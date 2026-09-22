@@ -20,8 +20,7 @@ export interface DailyEntry {
   note?: string;
 }
 
-export type RateReason =
-  'no_capital' | 'zero_capital_gain' | 'capital_reset' | 'invalid_historical_capital';
+export type RateReason = 'no_capital' | 'zero_capital_gain' | 'capital_reset';
 export interface DayResult {
   date: string;
   openingBalance: string;
@@ -43,7 +42,6 @@ export interface ReturnSegment {
 }
 
 export interface PerformanceSummary {
-  historicalRateIncluded?: boolean;
   closingBalance: string;
   periodPnl: string;
   cumulativePnl: string;
@@ -58,11 +56,11 @@ export interface PerformanceSummary {
 export interface LedgerSeries {
   days: DayResult[];
   summary: PerformanceSummary;
+  historicalPerformance?: Pick<PerformanceSummary, 'returnRate' | 'rateReason' | 'segments'>;
   curve?: CurvePoint[];
 }
 
 export interface CurvePoint {
-  historicalRateIncluded?: boolean;
   buy?: string;
   sell?: string;
   date: string;

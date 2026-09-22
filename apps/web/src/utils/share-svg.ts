@@ -74,12 +74,8 @@ export function renderShareSvg(model: ShareModel): { svg: string; width: number;
       text(450, 241, showCurve ? '收益率' : '当日收益率', 24, '#827a6e', 'middle'),
       text(450, 300, rateLabel(model.returnRate), 48, tone(model.returnRate), 'middle', 600),
     );
-  if (model.historicalRateIncluded === false)
-    parts.push(text(72, 375, '收益率不含无法还原本金的历史部分', 18, '#827a6e'));
   if (showCurve) {
-    const values = model.curve.map((point) =>
-      point.returnRate === null ? null : Number(point.returnRate) * 100,
-    );
+    const values = model.curve.map((point) => Number(point.returnRate ?? '0') * 100);
     const finite = values.filter(
       (value): value is number => value !== null && Number.isFinite(value),
     );

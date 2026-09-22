@@ -225,13 +225,15 @@ describe('ledger returns and original records', () => {
     );
     expect(result.portfolio.summary.returnRate).toBe('0.155');
   });
-  it('propagates undefined zero-capital gains, while empty capital is neutral', () => {
-    const result = run([entry('2026-09-01', '1', { sell: '100' })], { openingBalance: '100' });
+  it('leaves zero-capital gains undefined at that node and resumes with available capital', () => {
+    const entries = [entry('2026-09-01', '1', { sell: '100' })];
+    const result = run(entries, { openingBalance: '100' }, '2026-09-01');
     expect(result.portfolio.summary).toMatchObject({
       periodPnl: '1.00',
       returnRate: null,
       rateReason: 'zero_capital_gain',
     });
+    expect(run(entries, { openingBalance: '100' }).portfolio.summary.returnRate).toBe('0');
     expect(run([], { openingBalance: '0' }).portfolio.summary).toMatchObject({
       returnRate: null,
       rateReason: 'no_capital',

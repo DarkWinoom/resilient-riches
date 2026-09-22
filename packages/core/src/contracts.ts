@@ -7,7 +7,6 @@ export interface DashboardCategory extends CategoryView {
   monthPnl: string;
   monthReturnRate: string | null;
   totalReturnRate: string | null;
-  historicalRateIncluded?: boolean;
 }
 export interface DashboardResponse {
   today: string;

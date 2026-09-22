@@ -1,4 +1,4 @@
-import { calculateLedger, includeHistoricalReturn, periodRange } from '@resilient-riches/core';
+import { calculateLedger, periodRange } from '@resilient-riches/core';
 import type { Period } from '@resilient-riches/core';
 import type { loadLedgerInput } from '../database/ledger-input.ts';
 export type LedgerInput = ReturnType<typeof loadLedgerInput>;
@@ -19,13 +19,13 @@ export function performance(input: LedgerInput, today: string, period: Period, a
     includeCurve: true,
     includeOpeningHistory: true,
   });
-  const active = input.categories.filter((category) => category.openingDate <= range.to);
   const summary =
     period === 'all'
-      ? includeHistoricalReturn(
-          { ...ledger.portfolio.summary, periodPnl: ledger.portfolio.summary.cumulativePnl },
-          active,
-        )
+      ? {
+          ...ledger.portfolio.summary,
+          ...ledger.portfolio.historicalPerformance,
+          periodPnl: ledger.portfolio.summary.cumulativePnl,
+        }
       : ledger.portfolio.summary;
   return {
     range,

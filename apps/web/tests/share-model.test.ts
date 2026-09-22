@@ -132,7 +132,9 @@ describe('private share model and renderer', () => {
     model.curve = model.curve.map((point) => ({ ...point, returnRate: null }));
     model.returnRate = null;
     const result = renderShareSvg(model);
-    expect(result.svg).toContain('暂无可计算的收益率');
+    expect(result.svg).toContain('<path');
+    expect(result.svg).toContain('>—</text>');
+    expect(result.svg).not.toContain('暂无可计算的收益率');
     expect(result.svg).not.toMatch(/NaN|Infinity/);
     expect(JSON.stringify(report)).toBe(original);
   });

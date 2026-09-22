@@ -26,18 +26,7 @@ defineProps<{ overview: DashboardResponse['overview']; privateMode: boolean }>()
         <span :class="amountTone(overview.current.returnRate ?? '0')">{{
           rateLabel(overview.current.returnRate)
         }}</span
-        ><span
-          :title="
-            overview.current.historicalRateIncluded === false
-              ? '历史本金无法还原的部分未计入收益率，盈亏金额完整保留'
-              : '按初始金额减历史盈亏还原本金，再衔接启用后的收益率'
-          "
-          >{{
-            overview.current.historicalRateIncluded === false
-              ? '收益率（部分历史未计入）'
-              : '累计收益率'
-          }}</span
-        >
+        ><span>累计收益率</span>
       </div>
     </article>
     <article

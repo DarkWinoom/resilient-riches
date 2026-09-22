@@ -187,10 +187,7 @@ function order(key: SortKey) {
           </td>
           <td class="numeric" data-label="累计盈亏" :class="amountTone(item.totalPnl)">
             {{ privateMode ? '••••' : signedMoney(item.totalPnl)
-            }}<span class="holding-rate">{{ rateLabel(item.totalReturnRate) }}</span
-            ><span v-if="item.historicalRateIncluded === false" class="holding-rate muted"
-              >启用后收益率</span
-            >
+            }}<span class="holding-rate">{{ rateLabel(item.totalReturnRate) }}</span>
           </td>
           <td
             class="muted last-recorded numeric"

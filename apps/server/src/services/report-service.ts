@@ -1,4 +1,4 @@
-import { FinancialDecimal, includeHistoricalReturn, periodLabel } from '@resilient-riches/core';
+import { FinancialDecimal, periodLabel } from '@resilient-riches/core';
 import type { Period, ReportResponse } from '@resilient-riches/core';
 import type { AppDatabase } from '../database/database.ts';
 import { loadLedgerInput } from '../database/ledger-input.ts';
@@ -16,9 +16,7 @@ export function createReportService(database: AppDatabase, clock: () => string) 
       curve: selected.curve,
       categories: input.categories,
     };
-    const summaries = new Map(
-      selected.ledger.categories.map((item) => [item.categoryId, item.summary]),
-    );
+    const summaries = new Map(selected.ledger.categories.map((item) => [item.categoryId, item]));
     const label = periodLabel(period, data.range.to === today);
     const entries = input.entries.filter((entry) => entry.date <= data.range.to);
     const categories = data.categories
@@ -28,7 +26,8 @@ export function createReportService(database: AppDatabase, clock: () => string) 
           (!category.archivedOn || category.archivedOn >= data.range.from),
       )
       .map((category) => {
-        const summary = summaries.get(category.id)!;
+        const item = summaries.get(category.id)!;
+        const summary = item.summary;
         return {
           id: category.id,
           name: category.name,
@@ -36,9 +35,7 @@ export function createReportService(database: AppDatabase, clock: () => string) 
           pnl: period === 'all' ? summary.cumulativePnl : summary.periodPnl,
           endingBalance: summary.closingBalance,
           returnRate:
-            period === 'all'
-              ? includeHistoricalReturn(summary, [category]).returnRate
-              : summary.returnRate,
+            period === 'all' ? item.historicalPerformance!.returnRate : summary.returnRate,
           lastRecordedDate:
             entries.filter((entry) => entry.categoryId === category.id).at(-1)?.date ?? null,
         };
@@ -58,16 +55,10 @@ export function createReportService(database: AppDatabase, clock: () => string) 
       commentary.push(
         `${label}${pnl.isZero() ? '盈亏持平' : pnl.gt(0) ? '取得正收益' : '出现亏损'}，${winners.length} 个分类盈利，${losers.length} 个分类亏损。`,
       );
-    if (data.performance.historicalRateIncluded === false)
-      commentary.push('历史本金无法还原的部分未计入收益率，盈亏金额完整保留。');
     if (data.performance.returnRate !== null)
       commentary.push(
         `组合收益率为 ${new FinancialDecimal(data.performance.returnRate).mul(100).toFixed(2)}%。`,
       );
-    else if (data.performance.rateReason === 'capital_reset')
-      commentary.push(label + '本金归零后重新投入，收益金额仍可汇总，连续收益率不适用。');
-    else if (data.performance.rateReason === 'zero_capital_gain')
-      commentary.push(label + '存在零本金收益，无法计算连续收益率。');
     if (winners[0]) {
       const positive = winners.reduce(
         (sum, category) => sum.plus(category.pnl),

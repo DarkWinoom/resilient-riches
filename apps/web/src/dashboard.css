@@ -915,12 +915,6 @@
   border-color: var(--gold);
 }
 
-.chart-scope {
-  color: var(--muted);
-  font-size: 14px;
-  padding: 0 var(--panel-inset) 6px;
-}
-
 .period-controls--all .range-label {
   opacity: 1;
   cursor: default;

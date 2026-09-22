@@ -53,19 +53,37 @@ describe('return chart empty interaction', () => {
     expect(wrapper.get('.return-plot').attributes('aria-label')).toContain('收益率');
     wrapper.unmount();
   });
-  it.each([{ points: [] }, { points: [emptyPoint] }])(
-    'does not show a tooltip on an empty chart',
-    async ({ points }) => {
-      const wrapper = mount(ReturnChart, { props: { points, privateMode: false, loading: false } });
-      const plot = wrapper.get('.return-plot');
-      expect(wrapper.find('svg').exists()).toBe(false);
-      await plot.trigger('pointermove', { clientX: 300, clientY: 100 });
-      await plot.trigger('keydown', { key: 'End' });
-      expect(wrapper.find('.chart-tooltip').exists()).toBe(false);
-      expect(plot.attributes('tabindex')).toBe('-1');
-      wrapper.unmount();
-    },
-  );
+  it.each([{ points: [] }])('does not show a tooltip on an empty chart', async ({ points }) => {
+    const wrapper = mount(ReturnChart, { props: { points, privateMode: false, loading: false } });
+    const plot = wrapper.get('.return-plot');
+    expect(wrapper.find('svg').exists()).toBe(false);
+    await plot.trigger('pointermove', { clientX: 300, clientY: 100 });
+    await plot.trigger('keydown', { key: 'End' });
+    expect(wrapper.find('.chart-tooltip').exists()).toBe(false);
+    expect(plot.attributes('tabindex')).toBe('-1');
+    wrapper.unmount();
+  });
+  it('plots undefined nodes at zero without reporting a fabricated rate, then displays rates above 100%', async () => {
+    const wrapper = mount(ReturnChart, {
+      props: {
+        points: [
+          emptyPoint,
+          { ...emptyPoint, date: '2026-09-14', returnRate: '1.48', rateReason: null },
+        ],
+        privateMode: false,
+        loading: false,
+      },
+    });
+    expect(wrapper.find('svg').exists()).toBe(true);
+    const zeroY = wrapper.get('.chart-zero').attributes('y1');
+    expect(wrapper.get('.chart-line').attributes('d')).toContain(`M66,${zeroY}`);
+    await wrapper.get('.return-plot').trigger('keydown', { key: 'Home' });
+    expect(wrapper.get('.chart-tooltip').text()).toContain('累计收益率 —');
+    expect(wrapper.text()).not.toMatch(/历史本金|启用后收益率|无法连续/);
+    await wrapper.get('.return-plot').trigger('keydown', { key: 'End' });
+    expect(wrapper.get('.chart-tooltip').text()).toContain('+148.00%');
+    wrapper.unmount();
+  });
   it('clears an existing tooltip when the chart becomes empty and keeps valid zero-return data usable', async () => {
     const point = { ...emptyPoint, returnRate: '0', rateReason: null };
     const wrapper = mount(ReturnChart, {

@@ -35,18 +35,16 @@ watch(
 const values = computed(() =>
   props.points.map((point) =>
     shownMode.value === 'rate'
-      ? point.returnRate === null
-        ? null
-        : Number(point.returnRate) * 100
+      ? Number(point.returnRate ?? '0') * 100
       : Number(point.closingBalance),
   ),
 );
 const samples = values;
-const available = computed(() => values.value.some((value) => value !== null));
-const flat = computed(() => values.value.every((value) => value === null || value === 0));
+const available = computed(() => values.value.length > 0);
+const flat = computed(() => values.value.every((value) => value === 0));
 const lastValue = computed(() => values.value.at(-1) ?? null);
 const bounds = computed(() => {
-  const finite = samples.value.filter((value): value is number => value !== null);
+  const finite = samples.value;
   if (shownMode.value === 'assets' && finite.length) {
     const low = Math.min(...finite),
       high = Math.max(...finite);
@@ -68,20 +66,9 @@ const x = (index: number) =>
   66 + (index / Math.max(1, samples.value.length - 1)) * (width.value - 88);
 const y = (value: number) =>
   20 + ((bounds.value.high - value) / (bounds.value.high - bounds.value.low)) * (height.value - 56);
-const paths = computed(() => {
-  const result: string[] = [];
-  let path = '';
-  samples.value.forEach((value, index) => {
-    if (value === null) {
-      if (path) result.push(path);
-      path = '';
-      return;
-    }
-    path += `${path ? ' L' : 'M'}${x(index)},${y(value)}`;
-  });
-  if (path) result.push(path);
-  return result;
-});
+const path = computed(() =>
+  samples.value.map((value, index) => `${index ? 'L' : 'M'}${x(index)},${y(value)}`).join(' '),
+);
 const ticks = computed(() =>
   Array.from(
     { length: 5 },
@@ -158,12 +145,6 @@ const dateLabels = computed(() => {
         </button>
       </div>
     </header>
-    <p
-      v-if="shownMode === 'rate' && points.some((point) => point.historicalRateIncluded === false)"
-      class="chart-scope"
-    >
-      历史本金无法还原的部分未计入收益率，盈亏金额完整保留。
-    </p>
     <div
       ref="plot"
       class="return-plot"
@@ -199,22 +180,20 @@ const dateLabels = computed(() => {
           class="chart-zero"
         />
         <g :key="`${shownMode}-${points[0]?.date}-${points.length}`" class="chart-lines">
-          <template v-for="(path, index) in paths" :key="index">
-            <path v-if="shownMode === 'assets'" :d="path" class="chart-line chart-line--assets" />
-            <path v-else-if="flat" :d="path" class="chart-line chart-line--flat" />
-            <path
-              v-else
-              :d="path"
-              class="chart-line chart-line--up"
-              :clip-path="`url(#${clip}-up)`"
-            />
-            <path
-              v-if="!flat && shownMode === 'rate'"
-              :d="path"
-              class="chart-line chart-line--down"
-              :clip-path="`url(#${clip}-down)`"
-            />
-          </template>
+          <path v-if="shownMode === 'assets'" :d="path" class="chart-line chart-line--assets" />
+          <path v-else-if="flat" :d="path" class="chart-line chart-line--flat" />
+          <path
+            v-else
+            :d="path"
+            class="chart-line chart-line--up"
+            :clip-path="`url(#${clip}-up)`"
+          />
+          <path
+            v-if="!flat && shownMode === 'rate'"
+            :d="path"
+            class="chart-line chart-line--down"
+            :clip-path="`url(#${clip}-down)`"
+          />
         </g>
         <circle
           v-if="lastValue !== null"
@@ -236,13 +215,7 @@ const dateLabels = computed(() => {
         </text>
         <template v-if="tooltip && active !== null">
           <line :x1="x(active)" :x2="x(active)" y1="16" :y2="height - 34" class="chart-crosshair" />
-          <circle
-            v-if="values[active] !== null"
-            :cx="x(active)"
-            :cy="y(values[active] ?? 0)"
-            r="4"
-            class="chart-dot"
-          />
+          <circle :cx="x(active)" :cy="y(values[active] ?? 0)" r="4" class="chart-dot" />
         </template>
       </svg>
       <div v-else class="chart-empty">
@@ -282,13 +255,7 @@ const dateLabels = computed(() => {
             ><span
               >当日余额 <b>{{ moneyLabel(tooltip.closingBalance) }}</b></span
             ></template
-          ><span v-if="tooltip.rateReason && tooltip.rateReason !== 'no_capital'" class="muted">{{
-            tooltip.rateReason === 'capital_reset'
-              ? '本金归零后重启，无法连续复利'
-              : tooltip.rateReason === 'invalid_historical_capital'
-                ? '历史本金无效，无法计算收益率'
-                : '存在零本金收益，无法连续复利'
-          }}</span></template
+          ></template
         >
       </div>
     </div>

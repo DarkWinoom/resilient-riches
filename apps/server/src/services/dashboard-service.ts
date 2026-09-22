@@ -1,4 +1,4 @@
-import { calculateLedger, includeHistoricalReturn, periodRange } from '@resilient-riches/core';
+import { calculateLedger, periodRange } from '@resilient-riches/core';
 import type { DashboardResponse, CategoryDetailResponse, Period } from '@resilient-riches/core';
 import type { AppDatabase } from '../database/database.ts';
 import { loadLedgerInput } from '../database/ledger-input.ts';
@@ -9,7 +9,12 @@ export function createDashboardService(database: AppDatabase, clock: () => strin
     const today = clock();
     const input = loadLedgerInput(database);
     const stats = statisticsInput(input);
-    const current = calculateLedger({ ...input, through: today, timeline: 'events' });
+    const current = calculateLedger({
+      ...input,
+      through: today,
+      timeline: 'events',
+      includeOpeningHistory: true,
+    });
     const week = calculateLedger({
       ...input,
       from: periodRange('week', today, today).from,
@@ -25,7 +30,12 @@ export function createDashboardService(database: AppDatabase, clock: () => strin
     const allIncluded = stats.categories.length === input.categories.length;
     const overviewCurrent = allIncluded
       ? current
-      : calculateLedger({ ...stats, through: today, timeline: 'events' });
+      : calculateLedger({
+          ...stats,
+          through: today,
+          timeline: 'events',
+          includeOpeningHistory: true,
+        });
     const overviewMonth = allIncluded
       ? month
       : calculateLedger({
@@ -36,7 +46,7 @@ export function createDashboardService(database: AppDatabase, clock: () => strin
         });
     const daily = calculateLedger({ ...stats, from: today, through: today, timeline: 'events' });
     const selected = performance(stats, today, period, anchor);
-    const nowById = new Map(current.categories.map((item) => [item.categoryId, item.summary]));
+    const nowById = new Map(current.categories.map((item) => [item.categoryId, item]));
     const weekById = new Map(week.categories.map((item) => [item.categoryId, item.summary]));
     const monthById = new Map(month.categories.map((item) => [item.categoryId, item.summary]));
     return {
@@ -46,10 +56,10 @@ export function createDashboardService(database: AppDatabase, clock: () => strin
       anchor,
       range: selected.range,
       overview: {
-        current: includeHistoricalReturn(
-          overviewCurrent.portfolio.summary,
-          stats.categories.filter((category) => category.openingDate <= today),
-        ),
+        current: {
+          ...overviewCurrent.portfolio.summary,
+          ...overviewCurrent.portfolio.historicalPerformance,
+        },
         today: daily.portfolio.summary,
         month: overviewMonth.portfolio.summary,
       },
@@ -59,18 +69,16 @@ export function createDashboardService(database: AppDatabase, clock: () => strin
         const now = nowById.get(category.id)!;
         const weekly = weekById.get(category.id)!;
         const monthly = monthById.get(category.id)!;
-        const total = includeHistoricalReturn(now, [category]);
         return {
           ...category,
-          balance: now.closingBalance,
-          totalPnl: now.cumulativePnl,
-          lastRecordedDate: now.lastRecordedDate,
+          balance: now.summary.closingBalance,
+          totalPnl: now.summary.cumulativePnl,
+          lastRecordedDate: now.summary.lastRecordedDate,
           weekPnl: weekly.periodPnl,
           weekReturnRate: weekly.returnRate,
           monthPnl: monthly.periodPnl,
           monthReturnRate: monthly.returnRate,
-          totalReturnRate: total.returnRate,
-          ...(total.historicalRateIncluded === false ? { historicalRateIncluded: false } : {}),
+          totalReturnRate: now.historicalPerformance!.returnRate,
         };
       }),
     };

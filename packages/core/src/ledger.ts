@@ -16,47 +16,12 @@ import type {
   DayResult,
   LedgerResult,
   LedgerSeries,
-  PerformanceSummary,
   RateReason,
   ReturnSegment,
 } from './types.ts';
 import { validateCategory, validateEntry } from './validation.ts';
 
-export function includeHistoricalReturn(
-  summary: PerformanceSummary,
-  categories: readonly Category[],
-): PerformanceSummary {
-  const opening = sumMoney(categories.map((category) => parseMoney(category.openingBalance)));
-  const supported = categories.filter(
-    (category) =>
-      parseMoney(category.historicalPnl) <= 0n ||
-      parseMoney(category.openingBalance) > parseMoney(category.historicalPnl),
-  );
-  if (supported.length !== categories.length)
-    summary = { ...summary, historicalRateIncluded: false };
-  const history = sumMoney(supported.map((category) => parseMoney(category.historicalPnl)));
-  if (history === 0n) return summary;
-  const capital = opening - history;
-  if (capital <= 0n)
-    return { ...summary, returnRate: null, rateReason: 'invalid_historical_capital' };
-  if (opening === 0n) {
-    return {
-      ...summary,
-      returnRate: summary.returnRate === null && summary.rateReason === 'no_capital' ? '-1' : null,
-      rateReason:
-        summary.returnRate === null && summary.rateReason === 'no_capital' ? null : 'capital_reset',
-    };
-  }
-  if (summary.returnRate === null) return summary;
-  const rate = new FinancialDecimal(opening.toString())
-    .div(capital.toString())
-    .mul(new FinancialDecimal(summary.returnRate).plus(1))
-    .minus(1);
-  return { ...summary, returnRate: serializeRate(rate), rateReason: null };
-}
-
 interface InternalDay {
-  historicalRateIncluded?: boolean;
   date: string;
   opening: bigint;
   buy: bigint;
@@ -134,17 +99,14 @@ function compound(
   let wiped = false;
   let restarted = false;
   let zeroGain = false;
-  let invalidHistory = false;
   const snapshot = () => {
-    const reason: RateReason | null = invalidHistory
-      ? 'invalid_historical_capital'
-      : zeroGain
-        ? 'zero_capital_gain'
-        : restarted
-          ? 'capital_reset'
-          : valid
-            ? null
-            : 'no_capital';
+    const reason: RateReason | null = zeroGain
+      ? 'zero_capital_gain'
+      : restarted
+        ? 'capital_reset'
+        : valid
+          ? null
+          : 'no_capital';
     return {
       returnRate: reason === null ? serializeRate(total.minus(1)) : null,
       rateReason: reason,
@@ -161,7 +123,6 @@ function compound(
     current = undefined;
   };
   for (const point of points) {
-    if (point.reason === 'invalid_historical_capital') invalidHistory = true;
     if (point.rate === null) {
       if (point.reason === 'zero_capital_gain') {
         flush();
@@ -177,6 +138,7 @@ function compound(
       continue;
     }
     valid = true;
+    zeroGain = false;
     if (!current) {
       if (wiped) restarted = true;
       current = { from: point.date, to: point.date, factor: new FinancialDecimal(1) };
@@ -213,12 +175,31 @@ function serializeDay(point: InternalDay): DayResult {
   };
 }
 
+function historicalPoint(
+  point: InternalDay,
+  openingHistory: bigint,
+  recognizedHistory: bigint,
+  restoredHistory: bigint,
+  proceeds = 0n,
+): InternalDay {
+  const capital = point.opening + point.buy - point.sell + proceeds - restoredHistory;
+  return {
+    ...point,
+    pnl: point.pnl + openingHistory,
+    rate:
+      capital > 0n
+        ? new FinancialDecimal((point.pnl + recognizedHistory).toString()).div(capital.toString())
+        : null,
+    reason: capital > 0n ? null : point.reason,
+  };
+}
+
 function series(
   points: readonly InternalDay[],
   from: string,
   historical: bigint,
   includeCurve = false,
-  curvePoints: readonly InternalDay[] = points,
+  historicalPoints?: readonly InternalDay[],
 ): LedgerSeries {
   const selected = points.filter((point) => point.date >= from);
   const closing = points.at(-1)?.closing ?? 0n;
@@ -226,27 +207,29 @@ function series(
   const curve: CurvePoint[] = [];
   let running = 0n;
   const actualDays = includeCurve ? new Map(points.map((point) => [point.date, point])) : null;
-  const performance = compound(selected);
-  if (includeCurve)
-    compound(
-      curvePoints.filter((point) => point.date >= from),
-      includeCurve
-        ? (point, rate) => {
-            running = checkTotal(running + point.pnl);
-            curve.push({
-              date: point.date,
-              buy: formatMoney(point.buy),
-              sell: formatMoney(point.sell),
-              pnl: formatMoney(actualDays!.get(point.date)!.pnl),
-              ...(point.historicalRateIncluded === false ? { historicalRateIncluded: false } : {}),
-              cumulativePnl: formatMoney(running),
-              closingBalance: formatMoney(point.closing),
-              ...rate,
-            });
-          }
-        : undefined,
-    );
+  const onCurve: Parameters<typeof compound>[1] = includeCurve
+    ? (point, rate) => {
+        running = checkTotal(running + point.pnl);
+        curve.push({
+          date: point.date,
+          buy: formatMoney(point.buy),
+          sell: formatMoney(point.sell),
+          pnl: formatMoney(actualDays!.get(point.date)!.pnl),
+          cumulativePnl: formatMoney(running),
+          closingBalance: formatMoney(point.closing),
+          ...rate,
+        });
+      }
+    : undefined;
+  const performance = compound(selected, historicalPoints ? undefined : onCurve);
+  const historicalPerformance = historicalPoints
+    ? compound(
+        historicalPoints.filter((point) => point.date >= from),
+        onCurve,
+      )
+    : undefined;
   return {
+    ...(historicalPerformance ? { historicalPerformance } : {}),
     ...(includeCurve ? { curve } : {}),
     days: selected.map(serializeDay),
     summary: {
@@ -281,12 +264,18 @@ export function calculateLedger(input: {
       category,
       opening: parseMoney(category.openingBalance),
       historical: parseMoney(category.historicalPnl),
+      pendingHistory:
+        parseMoney(category.historicalPnl) > 0n &&
+        parseMoney(category.openingBalance) <= parseMoney(category.historicalPnl)
+          ? parseMoney(category.historicalPnl)
+          : 0n,
       previous: 0n,
       realized: 0n,
       activated: false,
       lastRecordedDate: null as string | null,
       records: new Map<string, ParsedEntry>(),
       points: [] as InternalDay[],
+      historicalPoints: [] as InternalDay[],
     };
   });
   const byId = new Map(states.map((state) => [state.category.id, state]));
@@ -318,7 +307,6 @@ export function calculateLedger(input: {
     input.from ?? (earliest !== undefined && earliest <= input.through ? earliest : input.through);
   const portfolio: InternalDay[] = [];
   const historicalCurve: InternalDay[] = [];
-  let historicalRateIncluded = true;
   let lastRecordedDate: string | null = null;
   const events = [
     ...new Set([
@@ -344,6 +332,7 @@ export function calculateLedger(input: {
     let liquidated = 0n;
     let openingHistory = 0n;
     let rateHistory = 0n;
+    let restoredHistory = 0n;
     let hasRecord = false;
     let hasOpening = false;
     for (const state of states) {
@@ -392,9 +381,6 @@ export function calculateLedger(input: {
       if (isOpening) {
         hasOpening = true;
         openingHistory += state.historical;
-        if (state.historical > 0n && state.opening <= state.historical)
-          historicalRateIncluded = false;
-        else rateHistory += state.historical;
       }
       state.points.push({
         date,
@@ -406,6 +392,23 @@ export function calculateLedger(input: {
         source: record ? 'recorded' : isOpening ? 'opening' : isArchived ? 'archived' : 'carried',
         lastRecordedDate: state.lastRecordedDate,
       });
+      if (input.includeOpeningHistory) {
+        const restored = isOpening && state.pendingHistory === 0n ? state.historical : 0n;
+        const recognized =
+          restored + (previous + buy - regularSell > 0n ? state.pendingHistory : 0n);
+        if (previous + buy - regularSell > 0n) state.pendingHistory = 0n;
+        rateHistory += recognized;
+        restoredHistory += restored;
+        state.historicalPoints.push(
+          historicalPoint(
+            state.points.at(-1)!,
+            isOpening ? state.historical : 0n,
+            recognized,
+            restored,
+            proceeds,
+          ),
+        );
+      }
       state.realized += values.pnl;
       state.previous = closing;
       buys.push(buy + (isOpening ? state.opening : 0n));
@@ -425,23 +428,11 @@ export function calculateLedger(input: {
       source: hasRecord ? 'recorded' : hasOpening ? 'opening' : 'carried',
       lastRecordedDate,
     });
-    if (input.includeCurve && input.includeOpeningHistory) {
+    if (input.includeOpeningHistory) {
       const point = portfolio.at(-1)!;
-      const historicalCapital = opening + buy - (sell - liquidated) - rateHistory;
-      const historicalProfit = point.pnl + rateHistory;
-      historicalCurve.push({
-        ...point,
-        pnl: point.pnl + openingHistory,
-        ...(historicalRateIncluded ? {} : { historicalRateIncluded: false }),
-        rate:
-          historicalCapital > 0n
-            ? new FinancialDecimal(historicalProfit.toString()).div(historicalCapital.toString())
-            : null,
-        reason:
-          historicalCapital <= 0n && rateHistory !== 0n
-            ? 'invalid_historical_capital'
-            : point.reason,
-      });
+      historicalCurve.push(
+        historicalPoint(point, openingHistory, rateHistory, restoredHistory, liquidated),
+      );
     }
   }
   return {
@@ -452,11 +443,17 @@ export function calculateLedger(input: {
       from,
       sumMoney(states.filter((state) => state.activated).map((state) => state.historical)),
       input.includeCurve,
-      input.includeOpeningHistory ? historicalCurve : portfolio,
+      input.includeOpeningHistory ? historicalCurve : undefined,
     ),
     categories: states.map((state) => ({
       categoryId: state.category.id,
-      ...series(state.points, from, state.activated ? state.historical : 0n),
+      ...series(
+        state.points,
+        from,
+        state.activated ? state.historical : 0n,
+        false,
+        input.includeOpeningHistory ? state.historicalPoints : undefined,
+      ),
     })),
   };
 }
