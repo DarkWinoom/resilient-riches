@@ -17,7 +17,7 @@ export function performance(input: LedgerInput, today: string, period: Period, a
     through: range.to,
     timeline: 'period',
     includeCurve: true,
-    includeOpeningHistory: true,
+    includeOpeningHistory: period === 'all',
   });
   const summary =
     period === 'all'

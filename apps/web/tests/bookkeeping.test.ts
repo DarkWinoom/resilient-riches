@@ -230,7 +230,7 @@ describe('bookkeeping UI with real ledger API', () => {
     expect(wrapper.get('.holdings-table').text()).not.toContain('1,100.00');
     expect(wrapper.get('.return-plot').attributes('aria-label')).toContain('收益率');
     await wrapper.get('.return-plot').trigger('keydown', { key: 'End' });
-    expect(wrapper.get('.chart-tooltip').text()).toContain('15.79%');
+    expect(wrapper.get('.chart-tooltip').text()).toContain('10.00%');
     expect(wrapper.get('.chart-tooltip').text()).not.toContain('当日余额');
   });
   it('opens a real historical entry from details and refreshes the dashboard after editing', async () => {

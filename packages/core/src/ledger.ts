@@ -178,19 +178,22 @@ function serializeDay(point: InternalDay): DayResult {
 function historicalPoint(
   point: InternalDay,
   openingHistory: bigint,
-  recognizedHistory: bigint,
   restoredHistory: bigint,
-  proceeds = 0n,
+  openingAssets: bigint,
 ): InternalDay {
-  const capital = point.opening + point.buy - point.sell + proceeds - restoredHistory;
+  const historicalCapital = openingAssets - restoredHistory;
+  const historicalFactor =
+    historicalCapital > 0n
+      ? new FinancialDecimal(openingAssets.toString()).div(historicalCapital.toString())
+      : new FinancialDecimal(1);
+  const canLink = point.rate !== null || (point.reason === 'no_capital' && !historicalFactor.eq(1));
   return {
     ...point,
     pnl: point.pnl + openingHistory,
-    rate:
-      capital > 0n
-        ? new FinancialDecimal((point.pnl + recognizedHistory).toString()).div(capital.toString())
-        : null,
-    reason: capital > 0n ? null : point.reason,
+    rate: canLink
+      ? historicalFactor.mul((point.rate ?? new FinancialDecimal(0)).plus(1)).minus(1)
+      : null,
+    reason: canLink ? null : point.reason,
   };
 }
 
@@ -264,11 +267,6 @@ export function calculateLedger(input: {
       category,
       opening: parseMoney(category.openingBalance),
       historical: parseMoney(category.historicalPnl),
-      pendingHistory:
-        parseMoney(category.historicalPnl) > 0n &&
-        parseMoney(category.openingBalance) <= parseMoney(category.historicalPnl)
-          ? parseMoney(category.historicalPnl)
-          : 0n,
       previous: 0n,
       realized: 0n,
       activated: false,
@@ -331,7 +329,7 @@ export function calculateLedger(input: {
     const sells: bigint[] = [];
     let liquidated = 0n;
     let openingHistory = 0n;
-    let rateHistory = 0n;
+    let openingAssets = 0n;
     let restoredHistory = 0n;
     let hasRecord = false;
     let hasOpening = false;
@@ -381,6 +379,7 @@ export function calculateLedger(input: {
       if (isOpening) {
         hasOpening = true;
         openingHistory += state.historical;
+        openingAssets += state.opening;
       }
       state.points.push({
         date,
@@ -393,19 +392,17 @@ export function calculateLedger(input: {
         lastRecordedDate: state.lastRecordedDate,
       });
       if (input.includeOpeningHistory) {
-        const restored = isOpening && state.pendingHistory === 0n ? state.historical : 0n;
-        const recognized =
-          restored + (previous + buy - regularSell > 0n ? state.pendingHistory : 0n);
-        if (previous + buy - regularSell > 0n) state.pendingHistory = 0n;
-        rateHistory += recognized;
+        const restored =
+          isOpening && state.opening > 0n && state.opening > state.historical
+            ? state.historical
+            : 0n;
         restoredHistory += restored;
         state.historicalPoints.push(
           historicalPoint(
             state.points.at(-1)!,
             isOpening ? state.historical : 0n,
-            recognized,
             restored,
-            proceeds,
+            previous,
           ),
         );
       }
@@ -431,7 +428,7 @@ export function calculateLedger(input: {
     if (input.includeOpeningHistory) {
       const point = portfolio.at(-1)!;
       historicalCurve.push(
-        historicalPoint(point, openingHistory, rateHistory, restoredHistory, liquidated),
+        historicalPoint(point, openingHistory, restoredHistory, opening + openingAssets),
       );
     }
   }

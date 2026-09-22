@@ -31,20 +31,18 @@ describe('historical return baseline', () => {
       '-0.333333333333333333333333333333',
     );
   });
-  it('supports past profits and distinguishes invalid or wiped capital', () => {
+  it('preserves supported history and omits unavailable historical baselines', () => {
     expect(
       result([{ ...category, openingBalance: '150000', historicalPnl: '50000' }]).returnRate,
     ).toBe('0.5');
     expect(result([{ ...category, historicalPnl: '500000' }])).toMatchObject({
-      returnRate: '1',
+      returnRate: '0',
     });
-    expect(result([{ ...category, openingBalance: '0' }]).returnRate).toBe('-1');
-    expect(result([{ ...category, openingBalance: '0' }], '1000', '1000').rateReason).toBe(
-      'capital_reset',
-    );
+    expect(result([{ ...category, openingBalance: '0' }]).returnRate).toBeNull();
+    expect(result([{ ...category, openingBalance: '0' }], '1000', '1000').returnRate).toBe('0');
   });
 
-  it('defers history until funding, then includes it once and compounds later returns', () => {
+  it('keeps unknown historical profit in amounts and compounds only measurable returns', () => {
     const input = {
       categories: [{ ...category, openingBalance: '0', historicalPnl: '15000' }],
       entries: [
@@ -60,13 +58,13 @@ describe('historical return baseline', () => {
     expect(curve[0]).toMatchObject({ returnRate: null, cumulativePnl: '15000.00' });
     expect(curve.find((point) => point.date === '2026-09-30')?.returnRate).toBeNull();
     expect(curve.find((point) => point.date === '2026-10-01')).toMatchObject({
-      returnRate: '1.48',
+      returnRate: '-0.02',
       cumulativePnl: '14800.00',
       pnl: '-200.00',
     });
-    expect(curve.at(-1)).toMatchObject({ returnRate: '1.5048', cumulativePnl: '14898.00' });
-    expect(ledger.portfolio.historicalPerformance?.returnRate).toBe('1.5048');
-    expect(ledger.categories[0]?.historicalPerformance?.returnRate).toBe('1.5048');
+    expect(curve.at(-1)).toMatchObject({ returnRate: '-0.0102', cumulativePnl: '14898.00' });
+    expect(ledger.portfolio.historicalPerformance?.returnRate).toBe('-0.0102');
+    expect(ledger.categories[0]?.historicalPerformance?.returnRate).toBe('-0.0102');
     expect(
       calculateLedger({ ...input, timeline: 'events' }).portfolio.historicalPerformance,
     ).toEqual(ledger.portfolio.historicalPerformance);
@@ -75,7 +73,7 @@ describe('historical return baseline', () => {
     expect(later.portfolio.summary.periodPnl).toBe('98.00');
   });
 
-  it('waits for the category own capital instead of using another category balance', () => {
+  it('does not use other categories or later deposits to invent historical capital', () => {
     const ledger = calculateLedger({
       categories: [
         { ...category, openingBalance: '0', historicalPnl: '500' },
@@ -89,16 +87,14 @@ describe('historical return baseline', () => {
       includeCurve: true,
     });
     expect(ledger.portfolio.curve?.[0]?.returnRate).toBe('0');
-    expect(ledger.categories[0]?.historicalPerformance?.returnRate).toBe('1');
-    expect(ledger.portfolio.historicalPerformance?.returnRate).toBe(
-      '0.333333333333333333333333333333',
-    );
+    expect(ledger.categories[0]?.historicalPerformance?.returnRate).toBe('0');
+    expect(ledger.portfolio.historicalPerformance?.returnRate).toBe('0');
   });
 
   it('recovers after a zero-capital node and supports history above the opening balance', () => {
     expect(
       result([{ ...category, openingBalance: '1000', historicalPnl: '1500' }]).returnRate,
-    ).toBe('1.5');
+    ).toBe('0');
     const ledger = calculateLedger({
       categories: [{ ...category, openingBalance: '0', historicalPnl: '150' }],
       entries: [
@@ -110,7 +106,7 @@ describe('historical return baseline', () => {
       includeCurve: true,
     });
     expect(ledger.portfolio.curve?.[0]?.returnRate).toBeNull();
-    expect(ledger.portfolio.historicalPerformance?.returnRate).toBe('1.6');
+    expect(ledger.portfolio.historicalPerformance?.returnRate).toBe('0.1');
     expect(ledger.portfolio.summary.returnRate).toBe('0.1');
   });
 });
