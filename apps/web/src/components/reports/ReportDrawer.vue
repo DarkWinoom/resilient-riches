@@ -4,13 +4,7 @@ import { periodLabel } from '@resilient-riches/core';
 import type { Period } from '@resilient-riches/core';
 import { useReport } from '../../composables/useReport.ts';
 import { reportTitles } from '../../utils/share-model.ts';
-import {
-  amountTone,
-  moneyLabel,
-  signedMoney,
-  rateLabel,
-  lastEntryLabel,
-} from '../../utils/format.ts';
+import { amountTone, moneyLabel, signedMoney, lastEntryLabel } from '../../utils/format.ts';
 import LoadingIndicator from '../ui/LoadingIndicator.vue';
 import BaseOverlay from '../ui/BaseOverlay.vue';
 import AppButton from '../ui/AppButton.vue';
@@ -18,6 +12,7 @@ import AppIcon from '../ui/AppIcon.vue';
 import PeriodPicker from '../dashboard/PeriodPicker.vue';
 import ReturnChart from '../dashboard/ReturnChart.vue';
 import ShareDialog from './ShareDialog.vue';
+import ReturnRate from '../ui/ReturnRate.vue';
 const props = defineProps<{
   initialPeriod: Period;
   initialAnchor: string;
@@ -68,9 +63,13 @@ const label = computed(() => periodLabel(data.value?.period ?? period.value, dat
           </div>
           <div>
             <span>收益率</span
-            ><strong :class="amountTone(data.summary.returnRate ?? '0')">{{
-              rateLabel(data.summary.returnRate)
-            }}</strong>
+            ><ReturnRate
+              as="strong"
+              :value="data.summary.returnRate"
+              :pnl="data.summary.periodPnl"
+              :historical-rate-included="data.summary.historicalRateIncluded"
+              :private-mode="privateMode"
+            />
           </div>
           <div>
             <span>期末资产</span
@@ -88,8 +87,7 @@ const label = computed(() => periodLabel(data.value?.period ?? period.value, dat
           v-if="data.period !== 'day'"
           :points="data.curve"
           :private-mode="privateMode"
-          :loading="loading"
-        />
+          :loading="loading" />
         <section class="report-categories">
           <div class="section-heading">
             <h3>分类收益</h3>
@@ -113,14 +111,18 @@ const label = computed(() => periodLabel(data.value?.period ?? period.value, dat
                 <td :class="amountTone(category.pnl)">
                   {{ privateMode ? '••••' : signedMoney(category.pnl) }}
                 </td>
-                <td :class="amountTone(category.returnRate ?? '0')">
-                  {{ rateLabel(category.returnRate) }}
+                <td>
+                  <ReturnRate
+                    :value="category.returnRate"
+                    :pnl="category.pnl"
+                    :historical-rate-included="category.historicalRateIncluded"
+                    :private-mode="privateMode"
+                  />
                 </td>
               </tr>
             </tbody>
-          </table>
-        </section></template
-      >
+          </table></section
+      ></template>
     </div>
     <footer class="overlay-footer">
       <AppButton @click="$emit('close')">关闭</AppButton

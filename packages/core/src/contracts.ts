@@ -2,6 +2,7 @@ import type { Category, DailyEntry, DayResult, PerformanceSummary, CurvePoint } 
 import type { DateRange, Period } from './dates.ts';
 
 export interface DashboardCategory extends CategoryView {
+  historicalRateIncluded?: boolean;
   weekPnl: string;
   weekReturnRate: string | null;
   monthPnl: string;
@@ -28,6 +29,7 @@ export interface CategoryDetailResponse {
 }
 
 export interface ReportCategory {
+  historicalRateIncluded?: boolean;
   id: string;
   name: string;
   color: string;

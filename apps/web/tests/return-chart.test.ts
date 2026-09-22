@@ -13,7 +13,7 @@ const emptyPoint: CurvePoint = {
   rateReason: 'no_capital',
 };
 describe('return chart empty interaction', () => {
-  it('plots assets and shows only cash flows and profit in the asset tooltip', async () => {
+  it('plots assets and shows the balance, cash flows and profit without a rate', async () => {
     const wrapper = mount(ReturnChart, {
       props: {
         points: [
@@ -43,6 +43,7 @@ describe('return chart empty interaction', () => {
     await wrapper.findAll('.chart-modes button')[1]!.trigger('click');
     await wrapper.get('.return-plot').trigger('keydown', { key: 'End' });
     const tip = wrapper.get('.chart-tooltip').text();
+    expect(tip).toContain('总金额 1,205.00');
     expect(tip).toContain('当日转入 250.00');
     expect(tip).toContain('当日转出 50.00');
     expect(tip).toContain('收益金额 +5.00');

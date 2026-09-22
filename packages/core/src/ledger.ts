@@ -22,6 +22,7 @@ import type {
 import { validateCategory, validateEntry } from './validation.ts';
 
 interface InternalDay {
+  historicalRateIncluded?: boolean;
   date: string;
   opening: bigint;
   buy: bigint;
@@ -180,6 +181,7 @@ function historicalPoint(
   openingHistory: bigint,
   restoredHistory: bigint,
   openingAssets: bigint,
+  historyIncluded: boolean,
 ): InternalDay {
   const historicalCapital = openingAssets - restoredHistory;
   const historicalFactor =
@@ -189,6 +191,7 @@ function historicalPoint(
   const canLink = point.rate !== null || (point.reason === 'no_capital' && !historicalFactor.eq(1));
   return {
     ...point,
+    ...(historyIncluded ? {} : { historicalRateIncluded: false }),
     pnl: point.pnl + openingHistory,
     rate: canLink
       ? historicalFactor.mul((point.rate ?? new FinancialDecimal(0)).plus(1)).minus(1)
@@ -214,6 +217,7 @@ function series(
     ? (point, rate) => {
         running = checkTotal(running + point.pnl);
         curve.push({
+          ...(point.historicalRateIncluded === false ? { historicalRateIncluded: false } : {}),
           date: point.date,
           buy: formatMoney(point.buy),
           sell: formatMoney(point.sell),
@@ -232,7 +236,16 @@ function series(
       )
     : undefined;
   return {
-    ...(historicalPerformance ? { historicalPerformance } : {}),
+    ...(historicalPerformance
+      ? {
+          historicalPerformance: {
+            ...historicalPerformance,
+            ...(historicalPoints!.some((point) => point.historicalRateIncluded === false)
+              ? { historicalRateIncluded: false }
+              : {}),
+          },
+        }
+      : {}),
     ...(includeCurve ? { curve } : {}),
     days: selected.map(serializeDay),
     summary: {
@@ -305,6 +318,7 @@ export function calculateLedger(input: {
     input.from ?? (earliest !== undefined && earliest <= input.through ? earliest : input.through);
   const portfolio: InternalDay[] = [];
   const historicalCurve: InternalDay[] = [];
+  let historyIncluded = true;
   let lastRecordedDate: string | null = null;
   const events = [
     ...new Set([
@@ -392,6 +406,9 @@ export function calculateLedger(input: {
         lastRecordedDate: state.lastRecordedDate,
       });
       if (input.includeOpeningHistory) {
+        const categoryHistoryIncluded =
+          state.historical === 0n || (state.opening > 0n && state.opening > state.historical);
+        historyIncluded &&= categoryHistoryIncluded;
         const restored =
           isOpening && state.opening > 0n && state.opening > state.historical
             ? state.historical
@@ -403,6 +420,7 @@ export function calculateLedger(input: {
             isOpening ? state.historical : 0n,
             restored,
             previous,
+            categoryHistoryIncluded,
           ),
         );
       }
@@ -428,7 +446,13 @@ export function calculateLedger(input: {
     if (input.includeOpeningHistory) {
       const point = portfolio.at(-1)!;
       historicalCurve.push(
-        historicalPoint(point, openingHistory, restoredHistory, opening + openingAssets),
+        historicalPoint(
+          point,
+          openingHistory,
+          restoredHistory,
+          opening + openingAssets,
+          historyIncluded,
+        ),
       );
     }
   }

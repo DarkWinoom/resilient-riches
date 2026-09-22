@@ -14,13 +14,14 @@ function hide() {
 function disabledTarget(target: EventTarget | null) {
   return target instanceof Element
     ? target.closest(
-        ':disabled,[aria-disabled="true"],.dp--cell-disabled,.dp--overlay-cell-disabled',
+        '[data-tooltip],:disabled,[aria-disabled="true"],.dp--cell-disabled,.dp--overlay-cell-disabled',
       )
     : null;
 }
 async function show(event: Event) {
   const target = disabledTarget(event.target);
   const reason =
+    target?.getAttribute('data-tooltip') ||
     target?.getAttribute('data-disabled-reason') ||
     target?.closest('[data-disabled-default]')?.getAttribute('data-disabled-default');
   if (!target || !reason) {

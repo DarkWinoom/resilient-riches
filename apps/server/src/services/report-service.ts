@@ -36,6 +36,9 @@ export function createReportService(database: AppDatabase, clock: () => string) 
           endingBalance: summary.closingBalance,
           returnRate:
             period === 'all' ? item.historicalPerformance!.returnRate : summary.returnRate,
+          ...(period === 'all' && item.historicalPerformance!.historicalRateIncluded === false
+            ? { historicalRateIncluded: false }
+            : {}),
           lastRecordedDate:
             entries.filter((entry) => entry.categoryId === category.id).at(-1)?.date ?? null,
         };

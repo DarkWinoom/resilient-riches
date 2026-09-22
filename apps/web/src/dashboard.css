@@ -882,6 +882,15 @@
 .holding-excluded .holding-icon {
   opacity: 0.45;
 }
+.holding-excluded .profit {
+  color: color-mix(in srgb, var(--profit) 60%, var(--muted));
+}
+.holding-excluded .loss {
+  color: color-mix(in srgb, var(--loss) 60%, var(--muted));
+}
+[data-tooltip] {
+  cursor: help;
+}
 .chart-line--assets {
   stroke: var(--gold);
 }

@@ -120,6 +120,9 @@ describe('v1.2 statistics and asset history', () => {
     write(a.id, '2026-09-15', '9800', '10000');
     const data = dashboard.dashboard('all', today);
     expect(data.overview.current.returnRate).toBe('-0.02');
+    expect(data.overview.current.historicalRateIncluded).toBe(false);
+    expect(data.categories[0]?.historicalRateIncluded).toBe(false);
+    expect(data.curve.at(-1)?.historicalRateIncluded).toBe(false);
     expect(data.categories[0]?.totalReturnRate).toBe('-0.02');
     expect(data.performance.returnRate).toBe('-0.02');
     expect(data.curve[0]?.returnRate).toBeNull();
@@ -127,6 +130,8 @@ describe('v1.2 statistics and asset history', () => {
     expect(dashboard.detail(a.id, 'all', today).performance.returnRate).toBe('-0.02');
     const totalReport = report('all', today);
     expect(totalReport.summary.returnRate).toBe('-0.02');
+    expect(totalReport.summary.historicalRateIncluded).toBe(false);
+    expect(totalReport.categories[0]?.historicalRateIncluded).toBe(false);
     expect(totalReport.categories[0]?.returnRate).toBe('-0.02');
     expect(totalReport.commentary.join('')).not.toMatch(/历史本金|无法|启用后/);
     expect(dashboard.dashboard('month', today).categories).toEqual(data.categories);

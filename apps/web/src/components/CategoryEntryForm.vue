@@ -102,7 +102,7 @@ function edit(key: 'closingBalance' | 'buy' | 'sell' | 'note' | 'liquidationPnl'
       </div>
       <div>
         <span>当日收益率</span
-        ><strong :class="preview ? amountTone(preview.pnl) : ''">{{
+        ><strong :class="preview ? amountTone(preview.returnRate ?? '0') : ''">{{
           preview ? rateLabel(preview.returnRate) : '—'
         }}</strong>
       </div>

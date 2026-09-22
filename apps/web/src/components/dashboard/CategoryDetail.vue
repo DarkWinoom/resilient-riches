@@ -3,18 +3,13 @@ import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { periodRange, periodLabel } from '@resilient-riches/core';
 import type { CategoryDetailResponse, Period } from '@resilient-riches/core';
 import { api, errorMessage } from '../../api.ts';
-import {
-  amountTone,
-  moneyLabel,
-  signedMoney,
-  rateLabel,
-  lastEntryLabel,
-} from '../../utils/format.ts';
+import { amountTone, moneyLabel, signedMoney, lastEntryLabel } from '../../utils/format.ts';
 import LoadingIndicator from '../ui/LoadingIndicator.vue';
 import BaseOverlay from '../ui/BaseOverlay.vue';
 import AppButton from '../ui/AppButton.vue';
 import PeriodPicker from './PeriodPicker.vue';
 import ReturnChart from './ReturnChart.vue';
+import ReturnRate from '../ui/ReturnRate.vue';
 const props = defineProps<{
   id: string;
   today: string;
@@ -100,9 +95,13 @@ onUnmounted(() => controller?.abort());
           </div>
           <div>
             <span>{{ label }}收益率</span
-            ><strong :class="amountTone(data.performance.returnRate ?? '0')">{{
-              rateLabel(data.performance.returnRate)
-            }}</strong>
+            ><ReturnRate
+              as="strong"
+              :value="data.performance.returnRate"
+              :pnl="data.performance.periodPnl"
+              :historical-rate-included="data.performance.historicalRateIncluded"
+              :private-mode="privateMode"
+            />
           </div>
           <div>
             <span>累计盈亏</span

@@ -42,6 +42,7 @@ export interface ReturnSegment {
 }
 
 export interface PerformanceSummary {
+  historicalRateIncluded?: boolean;
   closingBalance: string;
   periodPnl: string;
   cumulativePnl: string;
@@ -56,11 +57,15 @@ export interface PerformanceSummary {
 export interface LedgerSeries {
   days: DayResult[];
   summary: PerformanceSummary;
-  historicalPerformance?: Pick<PerformanceSummary, 'returnRate' | 'rateReason' | 'segments'>;
+  historicalPerformance?: Pick<
+    PerformanceSummary,
+    'returnRate' | 'rateReason' | 'segments' | 'historicalRateIncluded'
+  >;
   curve?: CurvePoint[];
 }
 
 export interface CurvePoint {
+  historicalRateIncluded?: boolean;
   buy?: string;
   sell?: string;
   date: string;

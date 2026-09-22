@@ -71,6 +71,36 @@ function button(text: string) {
 }
 
 describe('bookkeeping UI with real ledger API', () => {
+  it('colors opposite-sign historical profit and measurable returns independently', async () => {
+    const category = await api.createCategory({
+      name: '历史收益示例',
+      color: '#b69a60',
+      openingDate: '2026-09-01',
+      openingBalance: '0',
+      historicalPnl: '15000',
+      note: '',
+    });
+    await api.saveEntries(today, [
+      {
+        categoryId: category.id,
+        categoryRevision: 1,
+        revision: null,
+        closingBalance: '9800',
+        buy: '10000',
+        sell: '0',
+        note: '',
+      },
+    ]);
+    wrapper = mount(BookkeepingPage, { global });
+    await settle();
+    const total = wrapper.get('[data-label="累计盈亏"]');
+    expect(total.classes()).toContain('profit');
+    expect(total.get('.holding-rate').classes()).toContain('loss');
+    expect(total.get('.holding-rate').attributes('data-tooltip')).toContain('盈亏含历史金额');
+    expect(wrapper.get('.summary-foot [data-tooltip]').classes()).toContain('loss');
+    await wrapper.get('[aria-label="隐藏金额"]').trigger('click');
+    expect(wrapper.find('[data-tooltip]').exists()).toBe(false);
+  });
   it('separates list actions, read-only details and a single-category editor', async () => {
     await create();
     wrapper = mount(BookkeepingPage, { global });

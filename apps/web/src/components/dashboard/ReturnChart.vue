@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, useId, useTemplateRef, watch } from 'vue';
 import type { CurvePoint } from '@resilient-riches/core';
-import { amountTone, moneyLabel, rateLabel, signedMoney } from '../../utils/format.ts';
+import { amountTone, moneyLabel, signedMoney, returnRateHint } from '../../utils/format.ts';
+import ReturnRate from '../ui/ReturnRate.vue';
 const props = defineProps<{
   points: readonly CurvePoint[];
   privateMode: boolean;
@@ -86,6 +87,16 @@ function tick(value: number) {
 }
 const tooltip = computed(() =>
   !available.value || active.value === null ? null : props.points[active.value],
+);
+const rateHint = computed(() =>
+  tooltip.value
+    ? returnRateHint(
+        tooltip.value.cumulativePnl,
+        tooltip.value.returnRate,
+        tooltip.value.historicalRateIncluded,
+        props.privateMode,
+      )
+    : undefined,
 );
 function pointAt(event: PointerEvent) {
   if (!available.value) {
@@ -230,6 +241,9 @@ const dateLabels = computed(() => {
         <strong>{{ tooltip.date }}</strong
         ><template v-if="shownMode === 'assets'">
           <span
+            >总金额 <b>{{ moneyLabel(tooltip.closingBalance) }}</b></span
+          >
+          <span
             >当日转入 <b>{{ moneyLabel(tooltip.buy ?? '0') }}</b></span
           >
           <span
@@ -239,11 +253,7 @@ const dateLabels = computed(() => {
             >收益金额 <b :class="amountTone(tooltip.pnl)">{{ signedMoney(tooltip.pnl) }}</b></span
           > </template
         ><template v-else
-          ><span
-            >累计收益率
-            <b :class="amountTone(tooltip.returnRate ?? '0')">{{
-              rateLabel(tooltip.returnRate)
-            }}</b></span
+          ><span>累计收益率 <ReturnRate as="b" :value="tooltip.returnRate" /></span
           ><template v-if="!privateMode"
             ><span
               >累计收益金额
@@ -255,7 +265,7 @@ const dateLabels = computed(() => {
             ><span
               >当日余额 <b>{{ moneyLabel(tooltip.closingBalance) }}</b></span
             ></template
-          ></template
+          ><span v-if="rateHint" class="muted">{{ rateHint }}</span></template
         >
       </div>
     </div>

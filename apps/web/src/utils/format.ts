@@ -20,6 +20,18 @@ export function rateLabel(value: string | null): string {
 export function amountTone(value: string): string {
   return new FinancialDecimal(value).isZero() ? 'muted' : value.startsWith('-') ? 'loss' : 'profit';
 }
+export function returnRateHint(
+  pnl: string | undefined,
+  rate: string | null,
+  historicalRateIncluded?: boolean,
+  privateMode = false,
+): string | undefined {
+  if (privateMode || historicalRateIncluded !== false || rate === null || pnl === undefined)
+    return undefined;
+  return new FinancialDecimal(pnl).mul(rate).lt(0)
+    ? '盈亏含历史金额，收益率仅统计可计算部分。'
+    : undefined;
+}
 export function lastEntryLabel(date: string | null, currentDate: string): string {
   if (!date) return '尚无录入';
   if (date === currentDate) return '今日已录入';

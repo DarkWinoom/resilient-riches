@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { DashboardResponse } from '@resilient-riches/core';
-import { amountTone, moneyLabel, signedMoney, rateLabel } from '../../utils/format.ts';
+import { amountTone, moneyLabel, signedMoney } from '../../utils/format.ts';
+import ReturnRate from '../ui/ReturnRate.vue';
 import AppIcon from '../ui/AppIcon.vue';
 defineProps<{ overview: DashboardResponse['overview']; privateMode: boolean }>();
 </script>
@@ -23,10 +24,12 @@ defineProps<{ overview: DashboardResponse['overview']; privateMode: boolean }>()
         privateMode ? '••••••' : signedMoney(overview.current.cumulativePnl)
       }}</strong>
       <div class="summary-foot">
-        <span :class="amountTone(overview.current.returnRate ?? '0')">{{
-          rateLabel(overview.current.returnRate)
-        }}</span
-        ><span>累计收益率</span>
+        <ReturnRate
+          :value="overview.current.returnRate"
+          :pnl="overview.current.cumulativePnl"
+          :historical-rate-included="overview.current.historicalRateIncluded"
+          :private-mode="privateMode"
+        /><span>累计收益率</span>
       </div>
     </article>
     <article
@@ -44,10 +47,9 @@ defineProps<{ overview: DashboardResponse['overview']; privateMode: boolean }>()
         privateMode ? '••••••' : signedMoney(overview[card.key].periodPnl)
       }}</strong>
       <div class="summary-foot">
-        <span :class="amountTone(overview[card.key].returnRate ?? '0')">{{
-          rateLabel(overview[card.key].returnRate)
-        }}</span
-        ><span>{{ card.key === 'today' ? '今日收益率' : '本月收益率' }}</span>
+        <ReturnRate :value="overview[card.key].returnRate" /><span>{{
+          card.key === 'today' ? '今日收益率' : '本月收益率'
+        }}</span>
       </div>
     </article>
   </section>

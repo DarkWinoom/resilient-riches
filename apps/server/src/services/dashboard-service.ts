@@ -79,6 +79,9 @@ export function createDashboardService(database: AppDatabase, clock: () => strin
           monthPnl: monthly.periodPnl,
           monthReturnRate: monthly.returnRate,
           totalReturnRate: now.historicalPerformance!.returnRate,
+          ...(now.historicalPerformance!.historicalRateIncluded === false
+            ? { historicalRateIncluded: false }
+            : {}),
         };
       }),
     };

@@ -2,14 +2,9 @@
 import { computed, ref } from 'vue';
 import { FinancialDecimal } from '@resilient-riches/core';
 import type { DashboardCategory } from '@resilient-riches/core';
-import {
-  amountTone,
-  recordingDateLabel,
-  moneyLabel,
-  signedMoney,
-  rateLabel,
-} from '../utils/format.ts';
+import { amountTone, recordingDateLabel, moneyLabel, signedMoney } from '../utils/format.ts';
 import AppIcon from './ui/AppIcon.vue';
+import ReturnRate from './ui/ReturnRate.vue';
 const props = withDefaults(
   defineProps<{
     items: readonly DashboardCategory[];
@@ -179,15 +174,21 @@ function order(key: SortKey) {
           </td>
           <td class="numeric" data-label="本周收益" :class="amountTone(item.weekPnl)">
             {{ privateMode ? '••••' : signedMoney(item.weekPnl)
-            }}<span class="holding-rate">{{ rateLabel(item.weekReturnRate) }}</span>
+            }}<ReturnRate class="holding-rate" :value="item.weekReturnRate" />
           </td>
           <td class="numeric" data-label="本月收益" :class="amountTone(item.monthPnl)">
             {{ privateMode ? '••••' : signedMoney(item.monthPnl)
-            }}<span class="holding-rate">{{ rateLabel(item.monthReturnRate) }}</span>
+            }}<ReturnRate class="holding-rate" :value="item.monthReturnRate" />
           </td>
           <td class="numeric" data-label="累计盈亏" :class="amountTone(item.totalPnl)">
             {{ privateMode ? '••••' : signedMoney(item.totalPnl)
-            }}<span class="holding-rate">{{ rateLabel(item.totalReturnRate) }}</span>
+            }}<ReturnRate
+              class="holding-rate"
+              :value="item.totalReturnRate"
+              :pnl="item.totalPnl"
+              :historical-rate-included="item.historicalRateIncluded"
+              :private-mode="privateMode"
+            />
           </td>
           <td
             class="muted last-recorded numeric"
