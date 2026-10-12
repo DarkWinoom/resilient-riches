@@ -121,17 +121,27 @@ describe('bookkeeping UI with real ledger API', () => {
     expect(wrapper.get('tbody').text()).toContain('新名称');
   });
 
-  it('opens the matching daily report and closes changed report filters without confirmation', async () => {
+  it('keeps report filters independent of homepage K periods and closes changed filters without confirmation', async () => {
     await create();
+    const dashboardRequest = vi.spyOn(api, 'dashboard');
     wrapper = mount(BookkeepingPage, { global });
     await settle();
+    expect(wrapper.get('.topbar-actions').text()).not.toContain('收益报表');
+    expect(wrapper.get('.performance-heading').text()).toContain('收益报表');
+    expect(wrapper.find('.performance-heading .period-controls').exists()).toBe(false);
     await button('月').trigger('click');
     await settle();
+    expect(dashboardRequest).toHaveBeenCalledTimes(1);
     await button('收益报表').trigger('click');
     await settle();
-    expect(wrapper.get('.report-title').text()).toContain('收益月报');
+    expect(wrapper.get('.report-title').text()).toContain('收益周报');
     expect(wrapper.getComponent(ReportDrawer).find('.return-panel').exists()).toBe(true);
     const report = wrapper.getComponent(ReportDrawer);
+    expect(report.find('.candlestick-panel').exists()).toBe(false);
+    expect(report.find('.chart-line').exists()).toBe(true);
+    await report.findAll('.period-segment button')[1]!.trigger('click');
+    await settle();
+    expect(report.get('.report-title').text()).toContain('收益月报');
     await report.findAll('.period-segment button')[2]!.trigger('click');
     await settle();
     expect(report.get('.report-title').text()).toContain('收益年报');
@@ -245,23 +255,24 @@ describe('bookkeeping UI with real ledger API', () => {
     wrapper = mount(BookkeepingPage, { global });
     await settle();
     const cards = wrapper.get('.summary-grid').text();
-    await button('总').trigger('click');
+    await button('月').trigger('click');
     await settle();
     expect(wrapper.get('.summary-grid').text()).toBe(cards);
     expect(wrapper.get('thead').text()).toContain('本周收益');
     await button('年').trigger('click');
     await settle();
     expect(wrapper.get('.summary-grid').text()).toBe(cards);
-    await button('资产轨迹').trigger('click');
-    expect(wrapper.get('.return-plot').attributes('aria-label')).toContain('每日总资产');
+    expect(wrapper.text()).not.toContain('资产轨迹');
+    expect(wrapper.get('.candlestick-plot').attributes('aria-label')).toContain('累计收益率');
     await wrapper.get('[aria-label="隐藏金额"]').trigger('click');
     expect(wrapper.get('.summary-grid').text()).not.toContain('1,100.00');
     expect(wrapper.get('.allocation-panel').text()).not.toContain('1,100.00');
     expect(wrapper.get('.holdings-table').text()).not.toContain('1,100.00');
-    expect(wrapper.get('.return-plot').attributes('aria-label')).toContain('收益率');
-    await wrapper.get('.return-plot').trigger('keydown', { key: 'End' });
-    expect(wrapper.get('.chart-tooltip').text()).toContain('10.00%');
-    expect(wrapper.get('.chart-tooltip').text()).not.toContain('当日余额');
+    expect(wrapper.get('.candlestick-plot').attributes('aria-label')).toContain('收益率');
+    await wrapper.get('.candlestick-plot').trigger('keydown', { key: 'End' });
+    expect(wrapper.get('.candlestick-readout').text()).toContain('年收益率 +10.00%');
+    expect(wrapper.get('.candlestick-readout').text()).not.toContain('1,100.00');
+    expect(wrapper.get('.candlestick-readout').text()).not.toMatch(/当日余额|累计收益金额/);
   });
   it('opens a real historical entry from details and refreshes the dashboard after editing', async () => {
     const category = await create();
@@ -331,14 +342,17 @@ describe('bookkeeping UI with real ledger API', () => {
     expect(wrapper.findAll('thead th')[2]?.attributes('aria-sort')).toBe('none');
     expect(wrapper.findAll('tbody tr')[0]?.text()).toContain('稳健理财');
   });
-  it('preserves the shown period with a visible retry message when a filter request fails', async () => {
+  it('preserves the shown history with a visible retry message when refreshing the ledger fails', async () => {
     await create();
     wrapper = mount(BookkeepingPage, { global });
     await settle();
+    const range = wrapper.get('.candlestick-navigation').text();
     vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('offline'));
-    await button('周').trigger('click');
+    await button('记录盈亏').trigger('click');
     await settle();
-    expect(wrapper.get('[role="alert"]').text()).toContain('当前仍显示 2026-09-07 ~ 2026-09-13');
+    expect(wrapper.get('[role="alert"]').text()).toContain('当前仍显示上次载入的数据');
+    expect(wrapper.get('.candlestick-navigation').text()).toBe(range);
+    expect(wrapper.findComponent(EntryDialog).exists()).toBe(false);
     expect(wrapper.get('thead').text()).toContain('本月收益');
     await button('重试').trigger('click');
     await settle();
@@ -627,9 +641,11 @@ describe('bookkeeping UI with real ledger API', () => {
     expect(detail.get('[aria-label="上一期间"]').attributes('disabled')).toBeDefined();
     expect(detail.get('[aria-label="下一期间"]').attributes('disabled')).toBeDefined();
     expect(detail.find('.detail-chart').exists()).toBe(true);
-    expect(wrapper.get('.performance-heading .period-segment [aria-pressed="true"]').text()).toBe(
-      '年',
-    );
+    expect(detail.findAll('.chart-modes button').map((item) => item.text())).toEqual([
+      '收益率',
+      '资产轨迹',
+    ]);
+    expect(wrapper.get('.candlestick-periods [aria-pressed="true"]').text()).toBe('年');
   });
   it('saves handle order including categories not participating in statistics', async () => {
     const a = await create('A');

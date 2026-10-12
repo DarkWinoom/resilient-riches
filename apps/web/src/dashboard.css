@@ -184,6 +184,10 @@
 .return-panel {
   grid-column: span 3;
 }
+.performance-grid > .allocation-panel {
+  height: auto;
+  min-height: 360px;
+}
 .chart-heading,
 .dashboard-workspace .panel-heading {
   display: flex;

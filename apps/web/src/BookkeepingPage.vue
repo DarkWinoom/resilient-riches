@@ -9,13 +9,11 @@ import AppIcon from './components/ui/AppIcon.vue';
 import AppHeader from './components/dashboard/AppHeader.vue';
 import AppFooter from './components/dashboard/AppFooter.vue';
 import SummaryCards from './components/dashboard/SummaryCards.vue';
-import PeriodPicker from './components/dashboard/PeriodPicker.vue';
-import ReturnChart from './components/dashboard/ReturnChart.vue';
+import CandlestickChart from './components/dashboard/CandlestickChart.vue';
 import AllocationBars from './components/dashboard/AllocationBars.vue';
 import CategoryDetail from './components/dashboard/CategoryDetail.vue';
 import ReportDrawer from './components/reports/ReportDrawer.vue';
-const { data, period, anchor, today, loading, error, items, load, choose, sorting, reorder } =
-  useDashboard();
+const { data, period, today, loading, error, items, load, sorting, reorder } = useDashboard();
 const drawer = ref(false),
   openingRecord = ref(false),
   reportOpen = ref(false),
@@ -55,7 +53,6 @@ async function record(id: string | null = null, date?: string, single = false) {
     :categories="items"
     @record="record($event ?? null, undefined, !!$event)"
     @create="manage()"
-    @report="reportOpen = true"
   />
   <main class="workspace dashboard-workspace">
     <div class="page-heading">
@@ -86,28 +83,25 @@ async function record(id: string | null = null, date?: string, single = false) {
       <section class="performance-section">
         <div class="performance-heading">
           <h2>收益表现</h2>
-          <PeriodPicker
-            :period="period"
-            :anchor="anchor"
-            :today="today"
-            :range="data.range"
-            :disabled="loading || sorting"
-            @change="choose"
-          />
+          <AppButton
+            data-overlay-fallback
+            :disabled="openingRecord || sorting || loading"
+            disabled-reason="账本暂未就绪，请稍候或重试"
+            @click="reportOpen = true"
+            ><AppIcon name="chart-bar" />收益报表</AppButton
+          >
         </div>
         <div v-if="error" class="performance-error" role="alert">
-          {{ error }}；当前仍显示 {{ data.range.from }} ~ {{ data.range.to }}。<button
-            class="text-button"
-            @click="load(false)"
-          >
+          {{ error }}；当前仍显示上次载入的数据。<button class="text-button" @click="load(false)">
             重试
           </button>
         </div>
         <div class="performance-grid">
-          <ReturnChart
-            :points="data.curve"
-            :private-mode="privateMode"
+          <CandlestickChart
+            :points="data.returnHistory"
+            :today="data.today"
             :loading="loading"
+            :private-mode="privateMode"
           /><AllocationBars :categories="statisticalItems" :private-mode="privateMode" />
         </div>
       </section>

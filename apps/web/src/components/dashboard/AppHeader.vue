@@ -6,7 +6,7 @@ import AppIcon from '../ui/AppIcon.vue';
 withDefaults(defineProps<{ disabled: boolean; categories?: readonly CategoryView[] }>(), {
   categories: () => [],
 });
-defineEmits<{ record: [id?: string]; report: []; create: [] }>();
+defineEmits<{ record: [id?: string]; create: [] }>();
 </script>
 <template>
   <header class="topbar">
@@ -16,14 +16,7 @@ defineEmits<{ record: [id?: string]; report: []; create: [] }>();
         ><span><strong>稳健生财</strong><span class="brand-en">RESILIENT RICHES</span></span></a
       >
       <nav class="topbar-actions" aria-label="记账操作">
-        <AppButton
-          data-overlay-fallback
-          variant="quiet"
-          :disabled="disabled"
-          disabled-reason="账本暂未就绪，请稍候或重试"
-          @click="$emit('report')"
-          ><AppIcon name="chart-bar" />收益报表</AppButton
-        ><AppButton class="category-create" :disabled="disabled" @click="$emit('create')"
+        <AppButton class="category-create" :disabled="disabled" @click="$emit('create')"
           ><AppIcon name="folder-plus" />新增分类</AppButton
         >
         <RecordMenu

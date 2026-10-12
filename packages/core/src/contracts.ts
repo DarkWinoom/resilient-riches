@@ -9,6 +9,18 @@ export interface DashboardCategory extends CategoryView {
   monthReturnRate: string | null;
   totalReturnRate: string | null;
 }
+export type ReturnHistoryPoint = Pick<
+  CurvePoint,
+  'date' | 'returnRate' | 'rateReason' | 'historicalRateIncluded'
+> & {
+  openingReturnRate?: string | null;
+  dailyReturnRate?: string | null;
+  carriedReturnRate?: string | null;
+  openingBalance?: string;
+  closingBalance?: string;
+  pnl?: string;
+  recorded?: boolean;
+};
 export interface DashboardResponse {
   today: string;
   earliestDate: string | null;
@@ -18,6 +30,7 @@ export interface DashboardResponse {
   overview: { current: PerformanceSummary; today: PerformanceSummary; month: PerformanceSummary };
   categories: DashboardCategory[];
   curve: CurvePoint[];
+  returnHistory: ReturnHistoryPoint[];
   performance: PerformanceSummary;
 }
 export interface CategoryDetailResponse {

@@ -100,6 +100,91 @@ describe('dashboard aggregation', () => {
     expect(past.categories[0]?.lastRecordedDate).toBe('2026-08-31');
     expect(past.current).toBe(false);
   });
+  it('provides sparse all-time return history for homepage candles independently of period filters', async () => {
+    const { service, category, write, get } = await setup();
+    const a = category('统计分类', '2026-08-01', '1000', '500');
+    const b = category('独立观察', '2001-01-01', '10000', '5000');
+    service.updateCategory(b.id, { revision: b.revision, includeInStats: false });
+    write(a.id, '2026-08-31', '1100');
+    write(a.id, '2026-09-12', '1210');
+    const current = await get('week');
+    const past = await get('month', '2026-08-01');
+    expect(current.returnHistory).toEqual(past.returnHistory);
+    expect(current.returnHistory).toHaveLength(4);
+    expect(current.returnHistory[0]).toMatchObject({
+      date: '2026-08-01',
+      returnRate: '1',
+      rateReason: null,
+      openingReturnRate: '1',
+      dailyReturnRate: '0',
+      openingBalance: '1000.00',
+      closingBalance: '1000.00',
+      pnl: '0.00',
+      recorded: false,
+    });
+    expect(current.returnHistory.at(-1)).toMatchObject({
+      date: '2026-09-13',
+      returnRate: '1.42',
+      rateReason: null,
+      openingReturnRate: '1.42',
+      dailyReturnRate: '0',
+      openingBalance: '1210.00',
+      closingBalance: '1210.00',
+      pnl: '0.00',
+      recorded: false,
+    });
+    expect(current.returnHistory.at(-1)?.returnRate).toBe(current.overview.current.returnRate);
+    expect(current.curve).toHaveLength(7);
+    expect(current.curve.at(-1)?.returnRate).toBe('0.1');
+    expect(current.returnHistory[1]).toMatchObject({
+      date: '2026-08-31',
+      openingBalance: '1000.00',
+      closingBalance: '1100.00',
+      pnl: '100.00',
+      recorded: true,
+    });
+  });
+  it('restores the opening level without attributing old returns to the opening day, including a total loss', async () => {
+    const { category, write, get } = await setup();
+    const a = category('带历史收益', '2026-09-01', '1000', '500');
+    write(a.id, '2026-09-01', '1100');
+    expect((await get()).returnHistory[0]).toMatchObject({
+      openingReturnRate: '1',
+      returnRate: '1.2',
+      dailyReturnRate: '0.1',
+    });
+    write(a.id, '2026-09-01', '0');
+    const points = (await get()).returnHistory;
+    expect(points[0]).toMatchObject({
+      openingReturnRate: '1',
+      returnRate: '-1',
+      dailyReturnRate: '-1',
+      carriedReturnRate: null,
+    });
+    expect(points.at(-1)).toMatchObject({ returnRate: '-1', dailyReturnRate: null });
+  });
+  it('marks explicit unchanged entries as data and ignores entries from excluded categories', async () => {
+    const { service, category, write, get } = await setup();
+    const a = category('统计分类');
+    const b = category('独立分类');
+    service.updateCategory(b.id, { revision: b.revision, includeInStats: false });
+    write(a.id, '2026-09-12', '1000');
+    write(b.id, '2026-09-13', '1100');
+    const points = (await get()).returnHistory;
+    expect(points.filter((point) => point.recorded).map((point) => point.date)).toEqual([
+      '2026-09-12',
+    ]);
+    expect(points.find((point) => point.recorded)).toMatchObject({
+      openingBalance: '1000.00',
+      closingBalance: '1000.00',
+      pnl: '0.00',
+    });
+    expect(points.at(-1)).toMatchObject({
+      date: '2026-09-13',
+      recorded: false,
+      closingBalance: '1000.00',
+    });
+  });
   it('describes actual positive contribution without fabricating market or ranking claims', async () => {
     const { app, category, write } = await setup();
     const a = category('盈利甲'),

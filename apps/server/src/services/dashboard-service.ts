@@ -1,19 +1,88 @@
-import { calculateLedger, periodRange } from '@resilient-riches/core';
-import type { DashboardResponse, CategoryDetailResponse, Period } from '@resilient-riches/core';
+import {
+  calculateLedger,
+  FinancialDecimal,
+  periodRange,
+  serializeRate,
+} from '@resilient-riches/core';
+import type {
+  DashboardResponse,
+  CategoryDetailResponse,
+  LedgerSeries,
+  Period,
+  ReturnHistoryPoint,
+} from '@resilient-riches/core';
 import type { AppDatabase } from '../database/database.ts';
 import { loadLedgerInput } from '../database/ledger-input.ts';
 import { ApiError } from './ledger-service.ts';
 import { performance, statisticsInput } from './performance.ts';
+import type { LedgerInput } from './performance.ts';
+
+function returnHistory(input: LedgerInput, portfolio: LedgerSeries): ReturnHistoryPoint[] {
+  const days = new Map(portfolio.days.map((day) => [day.date, day]));
+  const openingAssets = new Map<string, InstanceType<typeof FinancialDecimal>>();
+  for (const category of input.categories) {
+    openingAssets.set(
+      category.openingDate,
+      (openingAssets.get(category.openingDate) ?? new FinancialDecimal(0)).plus(
+        category.openingBalance,
+      ),
+    );
+  }
+  return (portfolio.curve ?? []).map((point) => {
+    const day = days.get(point.date)!;
+    let openingReturnRate: string | null = null;
+    if (point.returnRate !== null) {
+      if (day.returnRate === null) openingReturnRate = point.returnRate;
+      else if (day.returnRate === '-1') {
+        // A total loss cannot be inverted. Reconstruct the opening level without
+        // this day's entries, retaining any restored history activated that day.
+        openingReturnRate = calculateLedger({
+          ...input,
+          entries: input.entries.filter((entry) => entry.date < point.date),
+          through: point.date,
+          timeline: 'events',
+          includeOpeningHistory: true,
+        }).portfolio.historicalPerformance!.returnRate;
+      } else {
+        openingReturnRate = serializeRate(
+          new FinancialDecimal(point.returnRate)
+            .plus(1)
+            .div(new FinancialDecimal(day.returnRate).plus(1))
+            .minus(1),
+        );
+      }
+    }
+    return {
+      date: point.date,
+      returnRate: point.returnRate,
+      rateReason: point.rateReason,
+      openingReturnRate,
+      dailyReturnRate: day.returnRate,
+      carriedReturnRate: new FinancialDecimal(point.closingBalance).gt(0) ? '0' : null,
+      openingBalance: new FinancialDecimal(day.openingBalance)
+        .plus(openingAssets.get(point.date) ?? 0)
+        .toFixed(2),
+      closingBalance: point.closingBalance,
+      pnl: point.pnl,
+      recorded: day.source === 'recorded',
+      ...(point.historicalRateIncluded === false ? { historicalRateIncluded: false } : {}),
+    };
+  });
+}
+
 export function createDashboardService(database: AppDatabase, clock: () => string) {
   function dashboard(period: Period, anchor: string): DashboardResponse {
     const today = clock();
     const input = loadLedgerInput(database);
     const stats = statisticsInput(input);
+    const allIncluded = stats.categories.length === input.categories.length;
+    const earliest = stats.categories.map((item) => item.openingDate).sort()[0];
     const current = calculateLedger({
       ...input,
       through: today,
       timeline: 'events',
       includeOpeningHistory: true,
+      includeCurve: allIncluded,
     });
     const week = calculateLedger({
       ...input,
@@ -27,7 +96,6 @@ export function createDashboardService(database: AppDatabase, clock: () => strin
       through: today,
       timeline: 'events',
     });
-    const allIncluded = stats.categories.length === input.categories.length;
     const overviewCurrent = allIncluded
       ? current
       : calculateLedger({
@@ -35,6 +103,7 @@ export function createDashboardService(database: AppDatabase, clock: () => strin
           through: today,
           timeline: 'events',
           includeOpeningHistory: true,
+          includeCurve: true,
         });
     const overviewMonth = allIncluded
       ? month
@@ -51,7 +120,7 @@ export function createDashboardService(database: AppDatabase, clock: () => strin
     const monthById = new Map(month.categories.map((item) => [item.categoryId, item.summary]));
     return {
       today,
-      earliestDate: stats.categories.map((item) => item.openingDate).sort()[0] ?? null,
+      earliestDate: earliest ?? null,
       period,
       anchor,
       range: selected.range,
@@ -65,6 +134,9 @@ export function createDashboardService(database: AppDatabase, clock: () => strin
       },
       performance: selected.summary,
       curve: selected.curve,
+      returnHistory: earliest
+        ? returnHistory(stats, overviewCurrent.portfolio).filter((point) => point.date >= earliest)
+        : [],
       categories: input.categories.map((category) => {
         const now = nowById.get(category.id)!;
         const weekly = weekById.get(category.id)!;
